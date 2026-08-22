@@ -4,6 +4,8 @@
 > Para el panorama del producto y las decisiones de arquitectura, leer
 > [README.md](README.md). Este archivo es la bitácora de desarrollo.
 
+**Repositorio:** <https://github.com/becodeb/trellofake> (público, rama `main`)
+
 ## Arrancar
 
 ```bash
