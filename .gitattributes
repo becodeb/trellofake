@@ -1,0 +1,9 @@
+# El repo guarda todo con finales de línea LF, sin importar el sistema desde
+# el que se commitee. Evita diffs fantasma entre Windows y el resto.
+* text=auto eol=lf
+
+# Binarios: que git no intente normalizarlos.
+*.png binary
+*.jpg binary
+*.webp binary
+*.db binary

@@ -1,0 +1,507 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   Hilo — lenguaje visual
+
+   Papel cálido en vez de blanco puro, tinta cálida en vez de negro, una sola
+   familia de acento (arcilla) usada con cuentagotas, y estados comunicados por
+   forma + color de baja saturación en lugar de badges. Los bordes son de un
+   píxel; las sombras casi no existen salvo en capas que flotan de verdad.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* superficies */
+  --paper: #faf9f6;
+  --surface: #ffffff;
+  --surface-2: #f4f2ed;
+  --surface-3: #ebe8e1;
+  --overlay: rgba(28, 26, 23, 0.28);
+
+  /* líneas */
+  --line: #e7e3da;
+  --line-soft: #efece5;
+  --line-strong: #d6d0c4;
+
+  /* tinta */
+  --ink: #1c1a17;
+  --ink-2: #56514a;
+  --ink-3: #8b8478;
+  --ink-4: #a9a294;
+
+  /* acento */
+  --accent: #b4643f;
+  --accent-hover: #a25735;
+  --accent-ink: #8d4a2a;
+  --accent-wash: #f6ede7;
+  --accent-line: #e7d3c6;
+  --on-accent: #fffaf6;
+
+  /* tonos de estado */
+  --tone-neutral: #8b8478;
+  --tone-progress: #b07d24;
+  --tone-review: #5a5fa0;
+  --tone-done: #43795e;
+  --tone-blocked: #b0483a;
+  --tone-idea: #7d5a7b;
+  --tone-info: #55738a;
+
+  --tone-neutral-wash: #f0ede7;
+  --tone-progress-wash: #f8f0dd;
+  --tone-review-wash: #ececf7;
+  --tone-done-wash: #e6f0ea;
+  --tone-blocked-wash: #f8e9e6;
+  --tone-idea-wash: #f3ecf2;
+  --tone-info-wash: #e9f0f4;
+
+  /* radios: contenidos, nunca pastilla */
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(28, 26, 23, 0.05);
+  --shadow-md:
+    0 2px 4px -1px rgba(28, 26, 23, 0.05), 0 8px 20px -8px rgba(28, 26, 23, 0.12);
+  --shadow-lg:
+    0 1px 2px rgba(28, 26, 23, 0.06), 0 12px 32px -8px rgba(28, 26, 23, 0.16),
+    0 32px 64px -24px rgba(28, 26, 23, 0.14);
+
+  --ring: rgba(180, 100, 63, 0.4);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --paper: #141311;
+  --surface: #1a1917;
+  --surface-2: #211f1c;
+  --surface-3: #2a2724;
+  --overlay: rgba(6, 5, 4, 0.6);
+
+  --line: #2b2825;
+  --line-soft: #232120;
+  --line-strong: #3d3934;
+
+  --ink: #f2efe9;
+  --ink-2: #aca69c;
+  --ink-3: #7f786e;
+  --ink-4: #625c54;
+
+  --accent: #d0805a;
+  --accent-hover: #dd8d67;
+  --accent-ink: #e39a77;
+  --accent-wash: #2a1e17;
+  --accent-line: #48332a;
+  --on-accent: #1a0f08;
+
+  --tone-neutral: #8f887c;
+  --tone-progress: #d3a24a;
+  --tone-review: #8b8fd4;
+  --tone-done: #5fa483;
+  --tone-blocked: #d97363;
+  --tone-idea: #ab84a8;
+  --tone-info: #7ba0b8;
+
+  --tone-neutral-wash: #262320;
+  --tone-progress-wash: #2e2416;
+  --tone-review-wash: #21212f;
+  --tone-done-wash: #1a2721;
+  --tone-blocked-wash: #2e1d1a;
+  --tone-idea-wash: #271f26;
+  --tone-info-wash: #1b242a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.3), 0 8px 20px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg:
+    0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.55),
+    0 32px 64px -24px rgba(0, 0, 0, 0.5);
+
+  --ring: rgba(208, 128, 90, 0.45);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-line: var(--accent-line);
+  --color-on-accent: var(--on-accent);
+
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-progress: var(--tone-progress);
+  --color-tone-review: var(--tone-review);
+  --color-tone-done: var(--tone-done);
+  --color-tone-blocked: var(--tone-blocked);
+  --color-tone-idea: var(--tone-idea);
+  --color-tone-info: var(--tone-info);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-display), Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  /* Escala compacta: 13px es el tamaño de trabajo, no 16px. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.6rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.95rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.3rem;
+  --text-4xl: 2.375rem;
+  --text-4xl--line-height: 2.7rem;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Registradas acá para poder usarlas como variantes: data-[state=open]:animate-rise */
+  --animate-rise: rise 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade: fade 160ms ease-out both;
+  --animate-fade-out: fade 120ms ease-in reverse both;
+  --animate-pop: pop 260ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-sheet-out: sheet-out 160ms ease-in both;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.014em;
+    font-weight: 560;
+  }
+
+  /* Anillo de foco visible solo por teclado, nunca al clickear. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+    border-radius: var(--r-sm);
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::placeholder {
+    color: var(--ink-4);
+  }
+
+  /* Scrollbars discretas: la app tiene muchas columnas scrolleables. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  :hover::-webkit-scrollbar-thumb {
+    background-color: var(--line-strong);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Superficie base de tarjetas y paneles. */
+  .surface {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  /* Fila de lista con separadores hairline y hover contenido. */
+  .row {
+    transition:
+      background-color 120ms var(--ease-out-quint),
+      box-shadow 120ms var(--ease-out-quint);
+  }
+
+  .row:hover {
+    background-color: var(--surface-2);
+  }
+
+  .hairline {
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .hairline:last-child {
+    border-bottom: none;
+  }
+
+  /* Contenido de texto largo (descripciones, notas, decisiones). */
+  .prose-note {
+    color: var(--ink-2);
+    font-size: var(--text-base);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .prose-note strong {
+    color: var(--ink);
+    font-weight: 560;
+  }
+
+  .prose-note a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+  }
+
+  /* Papel rayado sutil detrás de zonas vacías, evita el vacío plano. */
+  .grid-paper {
+    background-image: radial-gradient(var(--line) 0.5px, transparent 0.5px);
+    background-size: 14px 14px;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  /* Truncado en 2 líneas para descripciones de tarjeta. */
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .drag-none {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Animaciones. Todas por debajo de 300 ms y con una causa: algo apareció,
+   algo cambió de estado, algo se completó.
+   -------------------------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 var(--ring);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.animate-rise {
+  animation: rise 260ms var(--ease-out-quint) both;
+}
+
+.animate-fade {
+  animation: fade 180ms ease-out both;
+}
+
+.animate-pop {
+  animation: pop 260ms var(--ease-spring) both;
+}
+
+.animate-ring {
+  animation: pulse-ring 700ms ease-out;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* Radix apila sus capas flotantes sobre el resto de la app. */
+[data-radix-popper-content-wrapper] {
+  z-index: 60;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,272 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+
+import { requireWorkspace } from "@/server/auth/context";
+import { getProject, subtreeIds } from "@/server/domain/projects";
+import { listItems } from "@/server/domain/items";
+import { projectHistory } from "@/server/domain/feed";
+import { workspaceMembers } from "@/server/domain/dashboard";
+import { db } from "@/server/db";
+import { collapseNoise } from "@/lib/shared";
+import { OPEN_TASK_STATUSES, accentHex } from "@/lib/domain";
+import { relativeTime } from "@/lib/format";
+import { ItemRow, InlineComposer } from "@/components/app/item-row";
+import { ActivityLine } from "@/components/app/activity";
+import { CommentThread } from "@/components/app/comments";
+import { ResourceLinks } from "@/components/app/resource-links";
+import { EmptyState, SectionHeader } from "@/components/ui/layout";
+import { ProgressBar } from "@/components/ui/glyphs";
+
+/**
+ * Resumen del proyecto.
+ *
+ * La versión corta de todo: en qué se divide, qué se está haciendo, qué se
+ * decidió, dónde están los recursos y qué pasó último. Cada bloque enlaza a su
+ * pestaña cuando hace falta el detalle.
+ */
+export default async function ProjectOverview({
+  params,
+}: {
+  params: Promise<{ slug: string; projectId: string }>;
+}) {
+  const { slug, projectId } = await params;
+  const ctx = await requireWorkspace(slug);
+
+  const project = await getProject(ctx.workspace.id, projectId);
+  if (!project) notFound();
+
+  const ids = await subtreeIds(project.id, project.path);
+
+  const [openTasks, decisions, problems, activity, members, comments] = await Promise.all([
+    listItems(ctx.workspace.id, {
+      projectIds: ids,
+      types: ["task"],
+      statuses: OPEN_TASK_STATUSES,
+      rootOnly: true,
+      orderBy: "priority",
+      take: 8,
+    }),
+    listItems(ctx.workspace.id, {
+      projectIds: ids,
+      types: ["decision"],
+      orderBy: "recent",
+      take: 4,
+    }),
+    listItems(ctx.workspace.id, {
+      projectIds: ids,
+      types: ["problem"],
+      statuses: ["open", "investigating"],
+      orderBy: "recent",
+      take: 4,
+    }),
+    projectHistory(ids, { take: 12 }),
+    workspaceMembers(ctx.workspace.id),
+    db.comment.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        editedAt: true,
+        author: {
+          select: { id: true, name: true, avatarUrl: true, accentColor: true },
+        },
+      },
+    }),
+  ]);
+
+  const people = members.map((m) => m.user);
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_312px]">
+      <div className="min-w-0 space-y-8">
+        {project.children.length > 0 && (
+          <section>
+            <SectionHeader title="Se divide en" count={project.children.length} />
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {project.children.map((child) => (
+                <Link
+                  key={child.id}
+                  href={`/w/${slug}/p/${child.id}`}
+                  className="group rounded-[var(--r-lg)] border border-line bg-surface p-3.5 transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[var(--shadow-sm)]"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="size-2 shrink-0 rounded-[3px]"
+                      style={{ background: accentHex(child.accent) }}
+                    />
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                      {child.name}
+                    </h3>
+                    <span className="text-2xs tabular text-ink-4">{child.progress}%</span>
+                  </div>
+
+                  {child.description && (
+                    <p className="mt-1.5 text-2xs leading-relaxed text-ink-4 clamp-2">
+                      {child.description}
+                    </p>
+                  )}
+
+                  <ProgressBar
+                    value={child.progress}
+                    tone={child.progress === 100 ? "done" : "progress"}
+                    className="mt-2.5"
+                  />
+
+                  <p className="mt-2 flex items-center gap-2 text-2xs text-ink-4">
+                    <span className="tabular">
+                      {child.rollup.done}/{child.rollup.total} tareas
+                    </span>
+                    {child.rollup.blocked > 0 && (
+                      <span style={{ color: "var(--tone-blocked)" }}>
+                        {child.rollup.blocked} frenada{child.rollup.blocked > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <SectionHeader
+            title="En curso"
+            count={project.subtreeRollup.open}
+            action={
+              <Link
+                href={`/w/${slug}/p/${projectId}/tareas`}
+                className="inline-flex items-center gap-1 text-xs text-ink-3 transition-colors hover:text-ink"
+              >
+                Ver el tablero <ArrowRight className="size-3" strokeWidth={2} />
+              </Link>
+            }
+          />
+          <div className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
+            {openTasks.map((task) => (
+              <ItemRow
+                key={task.id}
+                item={task}
+                slug={slug}
+                showProject={task.projectId !== project.id}
+              />
+            ))}
+            <InlineComposer
+              slug={slug}
+              projectId={project.id}
+              placeholder="Nueva tarea…"
+              className={openTasks.length > 0 ? "border-t border-line-soft" : undefined}
+            />
+          </div>
+        </section>
+
+        {problems.length > 0 && (
+          <section>
+            <SectionHeader title="Problemas abiertos" count={problems.length} />
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--tone-blocked)]/25 bg-surface">
+              {problems.map((problem) => (
+                <ItemRow key={problem.id} item={problem} slug={slug} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {decisions.length > 0 && (
+          <section>
+            <SectionHeader
+              title="Decisiones"
+              count={decisions.length}
+              action={
+                <Link
+                  href={`/w/${slug}/p/${projectId}/espacio?tipo=decision`}
+                  className="text-xs text-ink-3 transition-colors hover:text-ink"
+                >
+                  Ver todas
+                </Link>
+              }
+            />
+            <div className="space-y-2">
+              {decisions.map((decision) => (
+                <Link
+                  key={decision.id}
+                  href={`/w/${slug}/p/${projectId}?item=${decision.id}`}
+                  className="block rounded-[var(--r-lg)] border border-line bg-surface p-3.5 transition-colors hover:border-line-strong"
+                >
+                  <p className="text-sm font-medium leading-snug text-ink">{decision.title}</p>
+                  {decision.body && (
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-3 clamp-3">
+                      {decision.body}
+                    </p>
+                  )}
+                  <p className="mt-2 text-2xs text-ink-4">
+                    {decision.createdBy.name.split(" ")[0]} ·{" "}
+                    {relativeTime(decision.createdAt)}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <SectionHeader title="Conversación del proyecto" count={comments.length} />
+          <div className="rounded-[var(--r-lg)] border border-line bg-surface p-4">
+            <CommentThread
+              slug={slug}
+              projectId={project.id}
+              comments={comments}
+              members={people}
+              viewerId={ctx.user.id}
+              emptyHint="Para lo que es del proyecto entero y no de una tarea en particular."
+            />
+          </div>
+        </section>
+      </div>
+
+      <aside className="min-w-0 space-y-8">
+        <section>
+          <SectionHeader title="Recursos" count={project.links.length} />
+          <ResourceLinks
+            slug={slug}
+            projectId={project.id}
+            links={project.links}
+            canWrite={ctx.can("content.write")}
+          />
+        </section>
+
+        <section>
+          <SectionHeader
+            title="Lo último"
+            action={
+              <Link
+                href={`/w/${slug}/p/${projectId}/historial`}
+                className="text-xs text-ink-3 transition-colors hover:text-ink"
+              >
+                Historial
+              </Link>
+            }
+          />
+          {activity.length === 0 ? (
+            <EmptyState compact title="Sin movimientos todavía" />
+          ) : (
+            <div className="pl-0.5">
+              {collapseNoise(activity)
+                .slice(0, 8)
+                .map((event) => (
+                  <ActivityLine
+                    key={event.id}
+                    event={event}
+                    slug={slug}
+                    currentUserId={ctx.user.id}
+                    showProject={false}
+                  />
+                ))}
+            </div>
+          )}
+        </section>
+      </aside>
+    </div>
+  );
+}

@@ -1,0 +1,386 @@
+// Hilo — modelo de datos
+//
+// Principios:
+//  1. Un `Item` unificado modela los seis tipos de contenido (tarea, idea, nota,
+//     problema, decision, actualizacion). Comentarios, adjuntos, actividad,
+//     menciones y busqueda apuntan a una sola superficie en vez de seis.
+//  2. `Project` es auto-referencial: un subproyecto ES un proyecto. Se guarda un
+//     `path` materializado para resolver subarboles en una sola query.
+//  3. La actividad se escribe una vez (`Activity`) y se reparte a los usuarios
+//     relevantes (`FeedEntry`). Eso hace que el feed personalizado y los
+//     no-leidos sean baratos en lectura por usuario en lugar de recalcularse.
+//  4. Sin enums nativos: strings validados en el dominio (src/lib/domain.ts).
+//     Permite agregar estados/roles sin migracion y mantiene el schema portable
+//     entre SQLite (dev) y PostgreSQL (produccion).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------------- identidad
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  avatarUrl    String?
+  accentColor  String   @default("clay")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions        Session[]
+  memberships     Membership[]
+  projectSeats    ProjectMember[]
+  createdItems    Item[]           @relation("ItemAuthor")
+  assignments     ItemAssignment[] @relation("AssignmentUser")
+  assignedByMe    ItemAssignment[] @relation("AssignmentActor")
+  comments        Comment[]
+  mentions        Mention[]
+  attachments     Attachment[]
+  activities      Activity[]
+  feed            FeedEntry[]
+  createdProjects Project[]        @relation("ProjectAuthor")
+  resourceLinks   ResourceLink[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// --------------------------------------------------------------- workspace
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  mission   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members     Membership[]
+  projects    Project[]
+  items       Item[]
+  comments    Comment[]
+  attachments Attachment[]
+  activities  Activity[]
+  feed        FeedEntry[]
+}
+
+/// role: "admin" | "member" — pensado para admitir mas niveles sin migrar.
+model Membership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String    @default("member")
+  title       String?
+  joinedAt    DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId, role])
+}
+
+// --------------------------------------------------------------- proyectos
+
+/// Un subproyecto es un Project con `parentId`. Misma estructura, misma UI.
+/// `path` es la ruta materializada de ancestros ("/rootId/parentId/") para
+/// consultar un subarbol completo con un solo startsWith.
+model Project {
+  id          String  @id @default(cuid())
+  workspaceId String
+  parentId    String?
+  path        String  @default("/")
+  depth       Int     @default(0)
+
+  name        String
+  description String?
+  coverUrl    String?
+  accent      String  @default("clay")
+
+  /// "active" | "paused" | "done" | "cancelled"
+  status String @default("active")
+
+  /// "low" | "medium" | "high" | "urgent"
+  priority String @default("medium")
+
+  startDate   DateTime?
+  targetDate  DateTime?
+  completedAt DateTime?
+  archivedAt  DateTime?
+
+  /// "auto" (derivado de tareas y subproyectos) | "manual"
+  progressMode String @default("auto")
+  progress     Int    @default(0)
+
+  position    Float    @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent    Project?  @relation("ProjectTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Project[] @relation("ProjectTree")
+  createdBy User      @relation("ProjectAuthor", fields: [createdById], references: [id])
+
+  members     ProjectMember[]
+  items       Item[]
+  comments    Comment[]
+  attachments Attachment[]
+  links       ResourceLink[]
+  activities  Activity[]
+
+  @@index([workspaceId, status, archivedAt])
+  @@index([workspaceId, parentId])
+  @@index([path])
+}
+
+/// role: "lead" | "contributor"
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("contributor")
+  addedAt   DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// --------------------------------------------------------------- contenido
+
+/// Seis tipos, una tabla. `type` decide que campos se muestran y que estados
+/// son validos; el resto (comentarios, adjuntos, actividad) es comun.
+model Item {
+  id          String  @id @default(cuid())
+  workspaceId String
+  projectId   String
+  /// Subtareas: un Item hijo de otro Item.
+  parentId    String?
+
+  /// "task" | "idea" | "note" | "problem" | "decision" | "update"
+  type  String
+  title String
+  body  String?
+
+  /// Conjunto de valores segun `type` (ver src/lib/domain.ts)
+  status String @default("todo")
+
+  /// "low" | "medium" | "high" | "urgent"
+  priority String    @default("medium")
+  dueDate  DateTime?
+
+  /// "individual" (usa ItemAssignment) | "team" (todo el workspace)
+  assigneeScope String @default("individual")
+
+  /// "auto" (derivado de subtareas / estado) | "manual"
+  progressMode String @default("auto")
+  progress     Int    @default(0)
+
+  position    Float     @default(0)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  /// Trazabilidad cuando una idea se convierte en tarea.
+  convertedFromId String?
+
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      Item?            @relation("ItemTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Item[]           @relation("ItemTree")
+  createdBy   User             @relation("ItemAuthor", fields: [createdById], references: [id])
+  assignments ItemAssignment[]
+  comments    Comment[]
+  attachments Attachment[]
+  mentions    Mention[]
+  activities  Activity[]
+
+  @@index([projectId, type, status])
+  @@index([workspaceId, type, status])
+  @@index([parentId])
+  @@index([workspaceId, dueDate])
+}
+
+/// `weight` = porcentaje de colaboracion de esa persona en la tarea (0-100).
+/// El dominio reparte y normaliza para que la suma sea 100.
+model ItemAssignment {
+  id           String   @id @default(cuid())
+  itemId       String
+  userId       String
+  weight       Int      @default(100)
+  assignedById String
+  assignedAt   DateTime @default(now())
+
+  item       Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user       User @relation("AssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User @relation("AssignmentActor", fields: [assignedById], references: [id])
+
+  @@unique([itemId, userId])
+  @@index([userId])
+}
+
+// ----------------------------------------------------- comentarios y menciones
+
+model Comment {
+  id          String    @id @default(cuid())
+  workspaceId String
+  authorId    String
+  /// Un comentario cuelga de un Item o de un Project (nunca de ambos).
+  itemId      String?
+  projectId   String?
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  editedAt    DateTime?
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  item        Item?        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mentions    Mention[]
+  attachments Attachment[]
+
+  @@index([itemId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model Mention {
+  id        String   @id @default(cuid())
+  userId    String
+  commentId String?
+  itemId    String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  item    Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ------------------------------------------------------- archivos y recursos
+
+model Attachment {
+  id          String @id @default(cuid())
+  workspaceId String
+  uploaderId  String
+
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  storageKey String
+
+  /// "image" | "file"
+  kind   String @default("file")
+  width  Int?
+  height Int?
+
+  projectId String?
+  itemId    String?
+  commentId String?
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploader  User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item      Item?     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  comment   Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([itemId])
+  @@index([workspaceId, kind])
+}
+
+/// Links libres del proyecto (GitHub, Figma, Drive, staging, docs...).
+/// `kind` se autodetecta desde la URL pero es editable.
+model ResourceLink {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  url       String
+  kind      String   @default("link")
+  position  Float    @default(0)
+  addedById String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy User    @relation(fields: [addedById], references: [id])
+
+  @@index([projectId, position])
+}
+
+// ----------------------------------------------------------- actividad y feed
+
+/// Evento inmutable. `targetLabel` se desnormaliza para que el historial siga
+/// siendo legible aunque el elemento original se renombre o se borre.
+model Activity {
+  id          String @id @default(cuid())
+  workspaceId String
+  actorId     String
+
+  /// ver ACTIVITY en src/lib/domain.ts (p. ej. "item.status_changed")
+  verb String
+
+  projectId String?
+  itemId    String?
+
+  targetType  String
+  targetId    String
+  targetLabel String
+
+  /// JSON serializado con el detalle del cambio (from/to, valores, etc.)
+  meta      String?
+  createdAt DateTime @default(now())
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User        @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  project   Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item      Item?       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  entries   FeedEntry[]
+
+  @@index([workspaceId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([itemId, createdAt])
+}
+
+/// Fan-out en escritura: una fila por (usuario, evento relevante).
+/// `reason` explica por que le llega y `direct` marca si es notificacion.
+model FeedEntry {
+  id          String @id @default(cuid())
+  userId      String
+  activityId  String
+  workspaceId String
+
+  /// "assigned" | "mentioned" | "reply" | "author" | "participant"
+  reason    String
+  direct    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity  Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityId])
+  @@index([userId, workspaceId, createdAt])
+  @@index([userId, readAt])
+}
