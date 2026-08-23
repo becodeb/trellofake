@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s · Hilo",
   },
   description:
-    "El hilo de tu equipo: qué está activo, qué cambió, qué falta y qué se decidió.",
+    "El punto de encuentro entre una comunidad y el equipo que construye sus aplicaciones.",
 };
 
 export const viewport: Viewport = {

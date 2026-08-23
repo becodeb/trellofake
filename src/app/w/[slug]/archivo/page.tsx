@@ -27,7 +27,10 @@ export default async function ArchivePage({
   const { slug } = await params;
   const ctx = await requireWorkspace(slug);
 
-  const projects = await listProjects(ctx.workspace.id, { archived: true });
+  const projects = await listProjects(ctx.workspace.id, {
+    archived: true,
+    viewer: { role: ctx.role, userId: ctx.user.id },
+  });
   const roots = projects.filter((p) => !p.parentId);
 
   return (

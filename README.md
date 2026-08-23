@@ -1,11 +1,13 @@
 # Hilo
 
-Centro de operaciones para equipos que trabajan en varios proyectos a la vez.
+Punto de encuentro entre una comunidad educativa y el equipo que construye sus
+aplicaciones.
 
-No es un gestor de tareas. Existe para que un equipo **no pierda el contexto**:
-alguien vuelve después de dos días y en pocos segundos entiende qué está
-activo, qué cambió, qué hizo cada uno, qué le toca, qué está frenado y qué se
-decidió.
+Hilo combina dos experiencias en el mismo lugar: quienes desarrollan conservan
+la gestión de proyectos, tareas, responsables, problemas y decisiones; quienes
+no trabajan con el código pueden seguir los proyectos publicados, conversar con
+el equipo y proponer necesidades. La intención es que nadie pierda el contexto
+ni tenga que encontrar a la persona correcta por otro canal.
 
 ---
 
@@ -29,8 +31,9 @@ ejemplo. Después, entrar en <http://localhost:3000/login>:
 | Cuenta | Contraseña | Rol |
 |---|---|---|
 | `ezequiel@fernandezcruz.com.ar` | `hilo1234` | Admin |
-| `juan@cardinal.studio` | `hilo1234` | Miembro |
-| `valentina@cardinal.studio` | `hilo1234` | Miembro |
+| `juan@cardinal.studio` | `hilo1234` | Desarrollador |
+| `valentina@cardinal.studio` | `hilo1234` | Desarrolladora |
+| `alma@rededucativa.edu.ar` | `hilo1234` | Comunidad |
 
 Los datos de ejemplo no son relleno: son un equipo de tres personas a mitad de
 camino, con trabajo empezado, cosas trabadas, decisiones viejas y dos semanas
@@ -70,6 +73,21 @@ estado, un rol o un tipo de contenido se hace en `src/lib/domain.ts` y se
 propaga solo, sin migración. También mantiene el esquema portable: cambiar
 SQLite por PostgreSQL es cambiar dos líneas de `schema.prisma`.
 
+**Dos superficies, un solo producto.** `admin` y `developer` gestionan trabajo;
+`community` participa. Cada proyecto define si lo ve toda la comunidad o solo
+el equipo. El mismo control se aplica al listado, al acceso directo y a las
+acciones del servidor, por lo que una URL conocida no salta la privacidad.
+
+**Las propuestas son una entrada, no otro tablero.** Una necesidad nace en el
+buzón común, acumula conversación y el equipo la vincula a un proyecto o la
+promueve a uno nuevo. Así las ideas no se mezclan con tareas antes de tiempo y
+conservan quién las propuso.
+
+**Los recursos documentan acceso, no secretos.** La biblioteca admite bases de
+datos, diseños, repositorios, servicios y APIs. Las guías de integración pueden
+guardarse como Markdown o enlazarse a GitHub; Hilo las muestra y permite
+copiarlas para otra persona o una IA. Tokens y contraseñas quedan fuera.
+
 **Los permisos se preguntan por capacidad, no por rol.** La UI y las acciones
 preguntan `can("project.archive")`, no `role === "admin"`. Agregar un rol
 intermedio más adelante no obliga a tocar cada pantalla.
@@ -98,6 +116,7 @@ src/server/
   auth/          sesiones y guards de workspace por capacidad
   domain/        lógica de negocio: progreso, actividad, feed, búsqueda, proyectos
   actions/       mutaciones validadas con Zod, contrato único ActionResult
+                 (incluye propuestas y recursos compartidos)
 src/components/
   ui/            primitivas: botones, campos, capas flotantes, glifos de estado
   app/           piezas del producto: shell, paleta, panel de detalle, tablero

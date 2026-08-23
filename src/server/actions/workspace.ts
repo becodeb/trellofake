@@ -63,7 +63,7 @@ const memberSchema = z.object({
     .min(1, "Escribí un email.")
     .email("Ese email no parece válido.")
     .transform((v) => v.toLowerCase()),
-  role: z.enum(WORKSPACE_ROLES).default("member"),
+  role: z.enum(WORKSPACE_ROLES).default("community"),
   title: z.string().trim().max(60).optional(),
 });
 

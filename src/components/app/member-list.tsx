@@ -140,10 +140,9 @@ export function MemberList({
       </div>
 
       <p className="mt-2 text-2xs leading-relaxed text-ink-4">
-        Un <strong className="font-medium text-ink-3">admin</strong> administra gente, crea y
-        cierra proyectos y cambia la configuración. Un{" "}
-        <strong className="font-medium text-ink-3">miembro</strong> trabaja: crea proyectos y
-        contenido, comenta y actualiza el avance.
+        Los <strong className="font-medium text-ink-3">desarrolladores</strong> gestionan
+        proyectos y trabajo interno. La <strong className="font-medium text-ink-3">comunidad</strong>{" "}
+        sigue los proyectos visibles, comenta y propone ideas.
       </p>
 
       <AddMemberDialog slug={slug} open={inviting} onOpenChange={setInviting} />
@@ -164,7 +163,7 @@ function AddMemberDialog({
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [title, setTitle] = React.useState("");
-  const [role, setRole] = React.useState<WorkspaceRole>("member");
+  const [role, setRole] = React.useState<WorkspaceRole>("community");
   const [pending, setPending] = React.useState(false);
   const [credentials, setCredentials] = React.useState<{ name: string; password: string } | null>(
     null,
@@ -175,7 +174,7 @@ function AddMemberDialog({
     setName("");
     setEmail("");
     setTitle("");
-    setRole("member");
+    setRole("community");
     setCredentials(null);
   }, [open]);
 
@@ -267,7 +266,7 @@ function AddMemberDialog({
               </Field>
 
               <Field label="Rol">
-                <div className="flex gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">
+                <div className="grid grid-cols-3 gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">
                   {WORKSPACE_ROLES.map((option) => (
                     <button
                       key={option}

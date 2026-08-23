@@ -6,7 +6,7 @@ import { db } from "@/server/db";
 import { requireWorkspaceAction } from "@/server/auth/context";
 import { parseMentions, recordActivity } from "@/server/domain/activity";
 import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
-import { ACTIVITY } from "@/lib/domain";
+import { ACTIVITY, isTeamRole } from "@/lib/domain";
 
 const schema = z
   .object({
@@ -26,6 +26,9 @@ export async function addComment(
   return run(async () => {
     const ctx = await requireWorkspaceAction(slug, "comment.write");
     const input = schema.parse(raw);
+    if (!isTeamRole(ctx.role) && input.itemId) {
+      throw new Error("La comunidad comenta en la conversación general del proyecto.");
+    }
 
     // El comentario hereda el proyecto del elemento comentado.
     const item = input.itemId
@@ -39,6 +42,14 @@ export async function addComment(
       where: {
         id: item?.projectId ?? input.projectId!,
         workspaceId: ctx.workspace.id,
+        ...(isTeamRole(ctx.role)
+          ? {}
+          : {
+              OR: [
+                { visibility: "community" },
+                { members: { some: { userId: ctx.user.id } } },
+              ],
+            }),
       },
       select: { id: true, name: true },
     });

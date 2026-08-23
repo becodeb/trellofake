@@ -71,6 +71,9 @@ async function main() {
   // El orden importa: las tablas hoja primero para no pelear con las FK.
   await db.feedEntry.deleteMany();
   await db.activity.deleteMany();
+  await db.proposalReply.deleteMany();
+  await db.proposal.deleteMany();
+  await db.knowledgeResource.deleteMany();
   await db.mention.deleteMany();
   await db.attachment.deleteMany();
   await db.comment.deleteMany();
@@ -109,17 +112,26 @@ async function main() {
       accentColor: "indigo",
     },
   });
+  const alma = await db.user.create({
+    data: {
+      name: "Alma Pereyra",
+      email: "alma@rededucativa.edu.ar",
+      passwordHash,
+      accentColor: "amber",
+    },
+  });
 
   const workspace = await db.workspace.create({
     data: {
-      name: "Estudio Cardinal",
+      name: "Red Educativa Cardinal",
       slug: "cardinal",
-      mission: "Diseñamos y construimos productos digitales para otros equipos.",
+      mission: "Construimos y conectamos herramientas digitales para toda la comunidad educativa.",
       members: {
         create: [
           { userId: eze.id, role: "admin", title: "Producto", lastSeenAt: ago(2, 19) },
-          { userId: juan.id, role: "member", title: "Backend", lastSeenAt: ago(0, 9) },
-          { userId: vale.id, role: "member", title: "Diseño", lastSeenAt: ago(1, 17) },
+          { userId: juan.id, role: "developer", title: "Backend", lastSeenAt: ago(0, 9) },
+          { userId: vale.id, role: "developer", title: "Diseño UX", lastSeenAt: ago(1, 17) },
+          { userId: alma.id, role: "community", title: "Coordinación académica", lastSeenAt: ago(0, 15) },
         ],
       },
     },
@@ -134,7 +146,7 @@ async function main() {
   async function project(input: {
     name: string;
     description?: string;
-    parent?: { id: string; path: string; depth: number } | null;
+    parent?: { id: string; path: string; depth: number; visibility: string } | null;
     status?: string;
     priority?: string;
     accent?: string;
@@ -146,6 +158,7 @@ async function main() {
     createdBy: string;
     createdAt: Date;
     position: number;
+    visibility?: string;
   }) {
     const parent = input.parent ?? null;
     const created = await db.project.create({
@@ -157,6 +170,7 @@ async function main() {
         name: input.name,
         description: input.description ?? null,
         accent: input.accent ?? accentFromId(input.name),
+        visibility: input.visibility ?? parent?.visibility ?? "team",
         status: input.status ?? "active",
         priority: input.priority ?? "medium",
         startDate: input.start ?? null,
@@ -201,6 +215,7 @@ async function main() {
     createdBy: eze.id,
     createdAt: ago(38, 9, 20),
     position: 1,
+    visibility: "community",
   });
 
   const lumenFront = await project({
@@ -257,6 +272,7 @@ async function main() {
     createdBy: vale.id,
     createdAt: ago(16, 10),
     position: 2,
+    visibility: "community",
   });
 
   const rondaDiseno = await project({
@@ -340,6 +356,103 @@ async function main() {
       meta: { url: link.url },
     });
   }
+
+  await db.knowledgeResource.createMany({
+    data: [
+      {
+        workspaceId: ws,
+        addedById: juan.id,
+        name: "Directorio institucional de personas",
+        summary: "Base central con personal, áreas, sedes y datos de contacto institucionales.",
+        kind: "database",
+        url: "https://datos.cardinal.edu.ar/directorio",
+        accessGuide:
+          "Solicitar acceso de solo lectura al área de Sistemas. Para integrar una aplicación, pedir una cuenta de servicio; no usar cuentas personales.",
+        visibility: "community",
+      },
+      {
+        workspaceId: ws,
+        projectId: lumenBack.id,
+        addedById: juan.id,
+        name: "API de catálogo y stock",
+        summary: "Contrato para consultar productos y disponibilidad desde otras aplicaciones de la red.",
+        kind: "api",
+        url: "https://docs.lumen.com.ar/api",
+        accessGuide: "Pedir un token de desarrollo en Sistemas. Producción requiere aprobación del responsable del proyecto.",
+        markdown: [
+          "# Consumir la API de catálogo",
+          "",
+          "## Autenticación",
+          "Enviar el token como `Authorization: Bearer <token>`.",
+          "",
+          "## Consultar stock",
+          "```http",
+          "GET /api/v1/products/{id}/stock",
+          "Accept: application/json",
+          "```",
+          "",
+          "- Respetar el identificador estable del producto.",
+          "- Cachear la respuesta durante 60 segundos.",
+          "- Ante un 429, reintentar con espera incremental.",
+        ].join("\n"),
+        visibility: "community",
+      },
+      {
+        workspaceId: ws,
+        addedById: vale.id,
+        name: "Biblioteca de diseños de la red",
+        summary: "Componentes, pantallas de referencia y archivos editables para nuevas aplicaciones.",
+        kind: "design",
+        url: "https://figma.com/file/cardinal-education-system",
+        accessGuide: "Cualquier integrante puede ver. Pedir permiso de edición al equipo de Diseño.",
+        visibility: "community",
+      },
+    ],
+  });
+
+  const proposal = await db.proposal.create({
+    data: {
+      workspaceId: ws,
+      authorId: alma.id,
+      title: "Unificar los tickets de TICS y Mantenimiento",
+      body:
+        "Hoy cada área recibe pedidos por separado y las escuelas no saben dónde seguirlos. Necesitamos una vista común del estado, aunque cada equipo conserve su propia aplicación.",
+      category: "project",
+      status: "reviewing",
+      replies: {
+        create: [
+          {
+            authorId: juan.id,
+            body: "Podemos mantener ambos sistemas y acordar un contrato de API común. Lo primero sería documentar estados, prioridades y el identificador de sede.",
+            createdAt: ago(1, 11),
+          },
+        ],
+      },
+      createdAt: ago(3, 14),
+    },
+  });
+
+  await db.proposal.create({
+    data: {
+      workspaceId: ws,
+      authorId: alma.id,
+      title: "Avisos de avance para quienes propusieron una mejora",
+      body:
+        "Cuando una idea pasa a un proyecto estaría bueno recibir una novedad sin tener que entrar todos los días a buscarla.",
+      category: "improvement",
+      status: "proposed",
+      createdAt: ago(1, 16),
+    },
+  });
+
+  event({
+    at: ago(3, 14),
+    actorId: alma.id,
+    verb: ACTIVITY.proposalCreated,
+    targetType: "proposal",
+    targetId: proposal.id,
+    targetLabel: proposal.title,
+  });
 
   // ------------------------------------------------------------------ items
 
@@ -1177,7 +1290,8 @@ async function main() {
   console.log(`\nEntrá en http://localhost:3000/login\n`);
   console.log(`  ezequiel@fernandezcruz.com.ar   ${PASSWORD}   (admin)`);
   console.log(`  juan@cardinal.studio            ${PASSWORD}`);
-  console.log(`  valentina@cardinal.studio       ${PASSWORD}\n`);
+  console.log(`  valentina@cardinal.studio       ${PASSWORD}`);
+  console.log(`  alma@rededucativa.edu.ar        ${PASSWORD}   (comunidad)\n`);
 }
 
 const RANK: Record<FeedReason, number> = {

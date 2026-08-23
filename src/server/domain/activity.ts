@@ -33,7 +33,15 @@ export type RecordActivityInput = {
   workspaceId: string;
   actorId: string;
   verb: ActivityVerb;
-  targetType: "project" | "item" | "comment" | "member" | "link" | "file";
+  targetType:
+    | "project"
+    | "item"
+    | "comment"
+    | "member"
+    | "link"
+    | "file"
+    | "proposal"
+    | "resource";
   targetId: string;
   targetLabel: string;
   projectId?: string | null;

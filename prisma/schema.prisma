@@ -37,16 +37,19 @@ model User {
   sessions        Session[]
   memberships     Membership[]
   projectSeats    ProjectMember[]
-  createdItems    Item[]           @relation("ItemAuthor")
-  assignments     ItemAssignment[] @relation("AssignmentUser")
-  assignedByMe    ItemAssignment[] @relation("AssignmentActor")
+  createdItems    Item[]              @relation("ItemAuthor")
+  assignments     ItemAssignment[]    @relation("AssignmentUser")
+  assignedByMe    ItemAssignment[]    @relation("AssignmentActor")
   comments        Comment[]
   mentions        Mention[]
   attachments     Attachment[]
   activities      Activity[]
   feed            FeedEntry[]
-  createdProjects Project[]        @relation("ProjectAuthor")
+  createdProjects Project[]           @relation("ProjectAuthor")
   resourceLinks   ResourceLink[]
+  proposals       Proposal[]
+  proposalReplies ProposalReply[]
+  knowledge       KnowledgeResource[]
 }
 
 model Session {
@@ -77,14 +80,16 @@ model Workspace {
   attachments Attachment[]
   activities  Activity[]
   feed        FeedEntry[]
+  proposals   Proposal[]
+  knowledge   KnowledgeResource[]
 }
 
-/// role: "admin" | "member" — pensado para admitir mas niveles sin migrar.
+/// role: "admin" | "developer" | "community".
 model Membership {
   id          String    @id @default(cuid())
   userId      String
   workspaceId String
-  role        String    @default("member")
+  role        String    @default("community")
   title       String?
   joinedAt    DateTime  @default(now())
   lastSeenAt  DateTime  @default(now())
@@ -112,6 +117,9 @@ model Project {
   coverUrl    String?
   accent      String  @default("clay")
 
+  /// "community" (visible para toda la red) | "team" (solo desarrollo).
+  visibility String @default("team")
+
   /// "active" | "paused" | "done" | "cancelled"
   status String @default("active")
 
@@ -137,12 +145,15 @@ model Project {
   children  Project[] @relation("ProjectTree")
   createdBy User      @relation("ProjectAuthor", fields: [createdById], references: [id])
 
-  members     ProjectMember[]
-  items       Item[]
-  comments    Comment[]
-  attachments Attachment[]
-  links       ResourceLink[]
-  activities  Activity[]
+  members           ProjectMember[]
+  items             Item[]
+  comments          Comment[]
+  attachments       Attachment[]
+  links             ResourceLink[]
+  activities        Activity[]
+  proposals         Proposal[]          @relation("ProposalTarget")
+  promotedProposals Proposal[]          @relation("ProposalPromotion")
+  knowledge         KnowledgeResource[]
 
   @@index([workspaceId, status, archivedAt])
   @@index([workspaceId, parentId])
@@ -326,6 +337,77 @@ model ResourceLink {
   addedBy User    @relation(fields: [addedById], references: [id])
 
   @@index([projectId, position])
+}
+
+// ------------------------------------------------ propuestas de la comunidad
+
+/// Entrada liviana al trabajo del equipo. Una propuesta puede conversarse,
+/// vincularse a un proyecto existente o convertirse en un proyecto nuevo.
+model Proposal {
+  id          String @id @default(cuid())
+  workspaceId String
+  authorId    String
+  title       String
+  body        String
+  category    String @default("project")
+  status      String @default("proposed")
+
+  targetProjectId   String?
+  promotedProjectId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author          User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  targetProject   Project?        @relation("ProposalTarget", fields: [targetProjectId], references: [id], onDelete: SetNull)
+  promotedProject Project?        @relation("ProposalPromotion", fields: [promotedProjectId], references: [id], onDelete: SetNull)
+  replies         ProposalReply[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([targetProjectId])
+}
+
+model ProposalReply {
+  id         String   @id @default(cuid())
+  proposalId String
+  authorId   String
+  body       String
+  createdAt  DateTime @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author   User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
+}
+
+// -------------------------------------------- recursos e interoperabilidad
+
+/// Recurso compartido de la red. Puede pertenecer a todo el workspace o a un
+/// proyecto. Las guías API aceptan Markdown pegado o una fuente remota.
+model KnowledgeResource {
+  id          String  @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  addedById   String
+
+  name        String
+  summary     String?
+  kind        String  @default("link")
+  url         String?
+  accessGuide String?
+  markdown    String?
+  markdownUrl String?
+  visibility  String  @default("community")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy   User      @relation(fields: [addedById], references: [id])
+
+  @@index([workspaceId, visibility, kind])
+  @@index([projectId, kind])
 }
 
 // ----------------------------------------------------------- actividad y feed

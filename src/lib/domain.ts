@@ -9,12 +9,14 @@
 
 // ---------------------------------------------------------------- roles
 
-export const WORKSPACE_ROLES = ["admin", "member"] as const;
+export const WORKSPACE_ROLES = ["admin", "developer", "community"] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
-export const ROLE_LABEL: Record<WorkspaceRole, string> = {
+export const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
-  member: "Miembro",
+  developer: "Desarrollador",
+  community: "Comunidad",
+  member: "Desarrollador",
 };
 
 /**
@@ -30,18 +32,87 @@ export const CAPABILITIES = [
   "project.archive",
   "content.write",
   "comment.write",
+  "proposal.manage",
+  "resource.manage",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 const ROLE_CAPABILITIES: Record<WorkspaceRole, readonly Capability[]> = {
   admin: CAPABILITIES,
-  member: ["project.create", "content.write", "comment.write"],
+  developer: [
+    "project.create",
+    "project.manage",
+    "project.archive",
+    "content.write",
+    "comment.write",
+    "proposal.manage",
+    "resource.manage",
+  ],
+  community: ["comment.write"],
 };
 
 export function roleCan(role: string, capability: Capability): boolean {
+  // Compatibilidad con bases creadas antes de separar equipo y comunidad.
+  if (role === "member") role = "developer";
   const caps = ROLE_CAPABILITIES[role as WorkspaceRole];
   return caps ? caps.includes(capability) : false;
 }
+
+export function isTeamRole(role: string): boolean {
+  return role === "admin" || role === "developer" || role === "member";
+}
+
+export const PROJECT_VISIBILITIES = ["community", "team"] as const;
+export type ProjectVisibility = (typeof PROJECT_VISIBILITIES)[number];
+export const PROJECT_VISIBILITY_META: Record<
+  ProjectVisibility,
+  { label: string; description: string }
+> = {
+  community: {
+    label: "Visible para la comunidad",
+    description: "Todos pueden seguir avances, proponer y comentar.",
+  },
+  team: {
+    label: "Solo equipo de desarrollo",
+    description: "Tareas, decisiones y recursos quedan dentro del equipo.",
+  },
+};
+
+export const PROPOSAL_STATUSES = [
+  "proposed",
+  "reviewing",
+  "accepted",
+  "planned",
+  "declined",
+] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
+  proposed: "Nueva",
+  reviewing: "En conversación",
+  accepted: "Aceptada",
+  planned: "Llevada a proyecto",
+  declined: "No se hará por ahora",
+};
+
+export const RESOURCE_KINDS = [
+  "database",
+  "api",
+  "repository",
+  "design",
+  "document",
+  "service",
+  "link",
+] as const;
+export type ResourceKind = (typeof RESOURCE_KINDS)[number];
+export const RESOURCE_KIND_LABEL: Record<ResourceKind, string> = {
+  database: "Base de datos",
+  api: "API / integración",
+  repository: "Repositorio",
+  design: "Diseños",
+  document: "Documentación",
+  service: "Servicio",
+  link: "Enlace",
+};
 
 export const PROJECT_ROLES = ["lead", "contributor"] as const;
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
@@ -346,6 +417,10 @@ export const ACTIVITY = {
   memberJoined: "member.joined",
   memberRoleChanged: "member.role_changed",
   memberRemoved: "member.removed",
+  proposalCreated: "proposal.created",
+  proposalReplied: "proposal.replied",
+  proposalTriaged: "proposal.triaged",
+  resourceAdded: "resource.added",
 } as const;
 
 export type ActivityVerb = (typeof ACTIVITY)[keyof typeof ACTIVITY];

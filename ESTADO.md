@@ -1,6 +1,6 @@
 # Hilo — estado del desarrollo
 
-> Última sesión: 20 ago 2026. **El MVP está completo, compila y corre.**
+> Última sesión: 22 ago 2026. **La reconversión para red educativa está implementada, compila y corre.**
 > Para el panorama del producto y las decisiones de arquitectura, leer
 > [README.md](README.md). Este archivo es la bitácora de desarrollo.
 
@@ -40,6 +40,12 @@ Las 18 capacidades del MVP, todas verificadas contra la app corriendo:
 | 16 | Archivos e imágenes | `/api/files`, `src/server/storage.ts` |
 | 17 | Búsqueda global | ⌘K y `/buscar` |
 | 18 | Novedades y no-leídos | `FeedEntry` + `Membership.lastSeenAt` |
+| 19 | Roles admin/desarrollador/comunidad | capacidades en `src/lib/domain.ts` |
+| 20 | Visibilidad comunidad/solo equipo | `Project.visibility` + filtros de acceso |
+| 21 | Buzón de propuestas y conversación | `/ideas` + `Proposal` |
+| 22 | Derivar o iniciar una idea como proyecto | acciones en `proposals.ts` |
+| 23 | Biblioteca global de recursos | `/recursos` + `KnowledgeResource` |
+| 24 | Guías de integración Markdown/GitHub | pestaña `Cómo conectarse` |
 
 Extras que salieron del mismo modelo sin costo: página por persona
 (`/gente/[userId]`, contesta "qué está haciendo cada uno"), tablero con

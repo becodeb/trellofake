@@ -3,10 +3,17 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, Plus } from "lucide-react";
+import { Check, Eye, LockKeyhole, Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { ACCENTS, accentHex, type Accent, type Priority } from "@/lib/domain";
+import {
+  ACCENTS,
+  PROJECT_VISIBILITY_META,
+  accentHex,
+  type Accent,
+  type Priority,
+  type ProjectVisibility,
+} from "@/lib/domain";
 import { createProject } from "@/server/actions/projects";
 import type { PersonLike } from "@/components/ui/avatar";
 import { Avatar } from "@/components/ui/avatar";
@@ -50,6 +57,7 @@ export function NewProjectButton({
   const [startDate, setStartDate] = React.useState<string | null>(null);
   const [targetDate, setTargetDate] = React.useState<string | null>(null);
   const [people, setPeople] = React.useState<string[]>([]);
+  const [visibility, setVisibility] = React.useState<ProjectVisibility>("team");
 
   React.useEffect(() => {
     if (!open) return;
@@ -61,6 +69,7 @@ export function NewProjectButton({
     setStartDate(null);
     setTargetDate(null);
     setPeople([]);
+    setVisibility("team");
   }, [open, defaultParentId]);
 
   const submit = async () => {
@@ -75,6 +84,7 @@ export function NewProjectButton({
       startDate: startDate ?? undefined,
       targetDate: targetDate ?? undefined,
       memberIds: people,
+      visibility,
     });
     setPending(false);
 
@@ -168,6 +178,33 @@ export function NewProjectButton({
                 ))}
               </div>
             </Field>
+
+            {!defaultParentId && (
+              <Field label="Visibilidad" hint={PROJECT_VISIBILITY_META[visibility].description}>
+                <div className="grid grid-cols-2 gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">
+                  {(["team", "community"] as ProjectVisibility[]).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setVisibility(option)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-[var(--r-sm)] px-2 py-1.5 text-xs font-medium transition-all",
+                        visibility === option
+                          ? "bg-surface text-ink shadow-[var(--shadow-sm)]"
+                          : "text-ink-3 hover:text-ink",
+                      )}
+                    >
+                      {option === "team" ? (
+                        <LockKeyhole className="size-3" strokeWidth={2} />
+                      ) : (
+                        <Eye className="size-3" strokeWidth={2} />
+                      )}
+                      {option === "team" ? "Solo equipo" : "Comunidad"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
 
             <Field label="Quiénes participan" hint="Podés sumar gente más adelante.">
               <div className="flex flex-wrap gap-1.5">

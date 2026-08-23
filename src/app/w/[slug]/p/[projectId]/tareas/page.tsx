@@ -28,8 +28,12 @@ export default async function ProjectTasks({
   const { slug, projectId } = await params;
   const { vista, solo } = await searchParams;
   const ctx = await requireWorkspace(slug);
+  if (!ctx.can("content.write")) notFound();
 
-  const project = await getProject(ctx.workspace.id, projectId);
+  const project = await getProject(ctx.workspace.id, projectId, {
+    role: ctx.role,
+    userId: ctx.user.id,
+  });
   if (!project) notFound();
 
   const onlyThis = solo === "1";

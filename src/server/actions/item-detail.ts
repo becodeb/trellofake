@@ -13,7 +13,7 @@ import type { ActivityEvent } from "@/lib/shared";
  * suyo cuando se abre y listo.
  */
 export async function fetchItem(slug: string, itemId: string) {
-  const ctx = await requireWorkspaceAction(slug);
+  const ctx = await requireWorkspaceAction(slug, "content.write");
   const item = await getItem(ctx.workspace.id, itemId);
   if (!item) return null;
 
@@ -28,7 +28,7 @@ export async function fetchItemActivity(
   slug: string,
   itemId: string,
 ): Promise<ActivityEvent[]> {
-  await requireWorkspaceAction(slug);
+  await requireWorkspaceAction(slug, "content.write");
   return itemHistory(itemId, 40);
 }
 

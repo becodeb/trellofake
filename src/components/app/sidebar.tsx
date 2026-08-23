@@ -13,6 +13,8 @@ import {
   Search,
   Settings,
   LayoutGrid,
+  Library,
+  Lightbulb,
 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -28,6 +30,7 @@ export type SidebarProps = {
   unread: number;
   myOpenTasks: number;
   canManage: boolean;
+  canWork: boolean;
   onSearch: () => void;
   onCreate: () => void;
   onNavigate?: () => void;
@@ -40,6 +43,7 @@ export function Sidebar({
   unread,
   myOpenTasks,
   canManage,
+  canWork,
   onSearch,
   onCreate,
   onNavigate,
@@ -48,10 +52,14 @@ export function Sidebar({
   const base = `/w/${slug}`;
 
   const links = [
-    { href: base, label: "Hoy", icon: Compass, exact: true },
+    { href: base, label: "Inicio", icon: Compass, exact: true },
     { href: `${base}/novedades`, label: "Novedades", icon: Inbox, badge: unread },
-    { href: `${base}/mi-trabajo`, label: "Mi trabajo", icon: ListChecks, count: myOpenTasks },
+    ...(canWork
+      ? [{ href: `${base}/mi-trabajo`, label: "Mi trabajo", icon: ListChecks, count: myOpenTasks }]
+      : []),
     { href: `${base}/proyectos`, label: "Proyectos", icon: LayoutGrid },
+    { href: `${base}/ideas`, label: "Ideas propuestas", icon: Lightbulb },
+    { href: `${base}/recursos`, label: "Recursos compartidos", icon: Library },
   ];
 
   return (
@@ -68,14 +76,16 @@ export function Sidebar({
 
       {/* Las dos acciones que se usan cien veces por día viven arriba de todo. */}
       <div className="mb-1 flex gap-1.5">
-        <button
-          onClick={onCreate}
-          className="group flex h-8 flex-1 items-center gap-2 rounded-[var(--r-md)] bg-accent px-2.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
-        >
-          <Plus className="size-3.5" strokeWidth={2.25} />
-          Crear
-        </button>
-        <Tooltip content="Buscar" shortcut="⌘K">
+        {canWork && (
+          <button
+            onClick={onCreate}
+            className="group flex h-8 flex-1 items-center gap-2 rounded-[var(--r-md)] bg-accent px-2.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
+          >
+            <Plus className="size-3.5" strokeWidth={2.25} />
+            Crear
+          </button>
+        )}
+        {canWork && <Tooltip content="Buscar" shortcut="⌘K">
           <button
             onClick={onSearch}
             aria-label="Buscar"
@@ -83,7 +93,7 @@ export function Sidebar({
           >
             <Search className="size-3.5" strokeWidth={2} />
           </button>
-        </Tooltip>
+        </Tooltip>}
       </div>
 
       <nav className="flex flex-col gap-px">

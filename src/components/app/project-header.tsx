@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import {
   Check,
   ImagePlus,
+  Eye,
+  LockKeyhole,
   MoreHorizontal,
   Plus,
   RotateCcw,
@@ -17,9 +19,11 @@ import { cn } from "@/lib/cn";
 import {
   PROJECT_STATUSES,
   PROJECT_STATUS_META,
+  PROJECT_VISIBILITY_META,
   accentHex,
   type Priority,
   type ProjectStatus,
+  type ProjectVisibility,
 } from "@/lib/domain";
 import { dueState, longDate, pluralize } from "@/lib/format";
 import {
@@ -161,6 +165,14 @@ export function ProjectHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 px-2 text-2xs text-ink-4">
+            {project.visibility === "community" ? (
+              <Eye className="size-3" strokeWidth={2} />
+            ) : (
+              <LockKeyhole className="size-3" strokeWidth={2} />
+            )}
+            {project.visibility === "community" ? "Comunidad" : "Solo equipo"}
+          </span>
           <StatusMenu
             status={project.status}
             archived={Boolean(project.archivedAt)}
@@ -180,6 +192,31 @@ export function ProjectHeader({
                   <ImagePlus className="size-3.5" strokeWidth={1.9} />
                   {project.coverUrl ? "Cambiar portada" : "Poner una portada"}
                 </MenuItem>
+              )}
+
+              {canManage && (
+                <>
+                  <MenuSeparator />
+                  <MenuLabel>Quién puede verlo</MenuLabel>
+                  {(["community", "team"] as ProjectVisibility[]).map((visibility) => (
+                    <MenuItem
+                      key={visibility}
+                      onSelect={() => save({ visibility })}
+                    >
+                      {visibility === "community" ? (
+                        <Eye className="size-3.5" strokeWidth={1.9} />
+                      ) : (
+                        <LockKeyhole className="size-3.5" strokeWidth={1.9} />
+                      )}
+                      <span className="flex-1">
+                        {PROJECT_VISIBILITY_META[visibility].label}
+                      </span>
+                      {project.visibility === visibility && (
+                        <Check className="size-3.5 text-accent" strokeWidth={2.4} />
+                      )}
+                    </MenuItem>
+                  ))}
+                </>
               )}
 
               {project.archivedAt && canManage && (

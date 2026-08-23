@@ -10,20 +10,27 @@ export function ProjectTabs({
   slug,
   projectId,
   counts,
+  canWork,
 }: {
   slug: string;
   projectId: string;
   counts: { tasks: number; children: number; files: number };
+  canWork: boolean;
 }) {
   const pathname = usePathname();
   const base = `/w/${slug}/p/${projectId}`;
 
   const tabs = [
     { href: base, label: "Resumen", exact: true },
-    { href: `${base}/tareas`, label: "Tareas", count: counts.tasks },
-    { href: `${base}/espacio`, label: "Espacio" },
-    { href: `${base}/historial`, label: "Historial" },
-    { href: `${base}/archivos`, label: "Archivos", count: counts.files },
+    ...(canWork
+      ? [
+          { href: `${base}/tareas`, label: "Tareas", count: counts.tasks },
+          { href: `${base}/espacio`, label: "Espacio" },
+          { href: `${base}/historial`, label: "Historial" },
+          { href: `${base}/archivos`, label: "Archivos", count: counts.files },
+        ]
+      : []),
+    { href: `${base}/integracion`, label: "Cómo conectarse" },
   ];
 
   return (

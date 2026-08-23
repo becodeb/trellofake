@@ -33,8 +33,15 @@ export default async function ProjectOverview({
   const { slug, projectId } = await params;
   const ctx = await requireWorkspace(slug);
 
-  const project = await getProject(ctx.workspace.id, projectId);
+  const project = await getProject(ctx.workspace.id, projectId, {
+    role: ctx.role,
+    userId: ctx.user.id,
+  });
   if (!project) notFound();
+
+  if (!ctx.can("content.write")) {
+    return <CommunityProjectOverview slug={slug} ctx={ctx} project={project} />;
+  }
 
   const ids = await subtreeIds(project.id, project.path);
 
@@ -227,7 +234,7 @@ export default async function ProjectOverview({
 
       <aside className="min-w-0 space-y-8">
         <section>
-          <SectionHeader title="Recursos" count={project.links.length} />
+          <SectionHeader title="Enlaces del proyecto" count={project.links.length} />
           <ResourceLinks
             slug={slug}
             projectId={project.id}
@@ -266,6 +273,84 @@ export default async function ProjectOverview({
             </div>
           )}
         </section>
+      </aside>
+    </div>
+  );
+}
+
+async function CommunityProjectOverview({
+  slug,
+  ctx,
+  project,
+}: {
+  slug: string;
+  ctx: Awaited<ReturnType<typeof requireWorkspace>>;
+  project: NonNullable<Awaited<ReturnType<typeof getProject>>>;
+}) {
+  const [members, comments, guides] = await Promise.all([
+    workspaceMembers(ctx.workspace.id),
+    db.comment.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        editedAt: true,
+        author: { select: { id: true, name: true, avatarUrl: true, accentColor: true } },
+      },
+    }),
+    db.knowledgeResource.count({
+      where: { projectId: project.id, visibility: "community" },
+    }),
+  ]);
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0 space-y-8">
+        {project.children.length > 0 && (
+          <section>
+            <SectionHeader title="Partes del proyecto" count={project.children.length} />
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {project.children.map((child) => (
+                <Link key={child.id} href={`/w/${slug}/p/${child.id}`} className="rounded-[var(--r-lg)] border border-line bg-surface p-3.5 transition-colors hover:border-line-strong">
+                  <p className="text-sm font-medium text-ink">{child.name}</p>
+                  {child.description && <p className="mt-1 text-xs leading-relaxed text-ink-3 clamp-2">{child.description}</p>}
+                  <ProgressBar value={child.progress} tone={child.progress === 100 ? "done" : "progress"} className="mt-3" />
+                  <p className="mt-1.5 text-right text-2xs tabular text-ink-4">{child.progress}%</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <SectionHeader title="Conversación del proyecto" count={comments.length} />
+          <div className="rounded-[var(--r-lg)] border border-line bg-surface p-4">
+            <CommentThread
+              slug={slug}
+              projectId={project.id}
+              comments={comments}
+              members={members.map((member) => member.user)}
+              viewerId={ctx.user.id}
+              emptyHint="Podés preguntar, sugerir una mejora o sumar contexto para el equipo."
+            />
+          </div>
+        </section>
+      </div>
+
+      <aside className="space-y-5">
+        <div className="rounded-[var(--r-lg)] border border-line bg-surface p-4">
+          <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-ink-4">Estado compartido</p>
+          <p className="mt-3 text-3xl font-semibold tabular tracking-tight text-ink">{project.progress}%</p>
+          <ProgressBar value={project.progress} tone={project.progress === 100 ? "done" : "progress"} className="mt-2" />
+          <p className="mt-3 text-xs leading-relaxed text-ink-3">El progreso se actualiza a medida que el equipo termina las partes planificadas.</p>
+        </div>
+        <Link href={`/w/${slug}/p/${project.id}/integracion`} className="group block rounded-[var(--r-lg)] border border-line bg-surface p-4 transition-colors hover:border-line-strong">
+          <p className="text-sm font-semibold text-ink">Cómo conectarse</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-3">{guides ? `${guides} recursos y guías disponibles.` : "Todavía no hay una guía pública."}</p>
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-ink">Ver integración <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
+        </Link>
       </aside>
     </div>
   );

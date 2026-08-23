@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/server/db";
 import { taskRollupByProject, type TaskRollup, emptyRollup } from "@/server/domain/progress";
 import type { Person } from "@/lib/shared";
+import { isTeamRole } from "@/lib/domain";
 
 export type { Person } from "@/lib/shared";
 
@@ -20,6 +21,7 @@ const projectCardSelect = {
   description: true,
   coverUrl: true,
   accent: true,
+  visibility: true,
   status: true,
   priority: true,
   progress: true,
@@ -51,7 +53,22 @@ export type ProjectListOptions = {
   archived?: boolean;
   memberId?: string;
   take?: number;
+  viewer?: { role: string; userId: string };
 };
+
+function projectAccess(viewer?: { role: string; userId: string }) {
+  if (!viewer || isTeamRole(viewer.role)) return {};
+  return {
+    AND: [
+      {
+        OR: [
+          { visibility: "community" },
+          { members: { some: { userId: viewer.userId } } },
+        ],
+      },
+    ],
+  };
+}
 
 /**
  * Listado de proyectos con todo lo que una tarjeta necesita mostrar:
@@ -72,13 +89,14 @@ export async function listProjects(
           ? { archivedAt: { not: null } }
           : { archivedAt: null }),
       ...(options.memberId ? { members: { some: { userId: options.memberId } } } : {}),
+      ...projectAccess(options.viewer),
     },
     select: projectCardSelect,
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
     take: options.take,
   });
 
-  return decorate(projects);
+  return decorate(projects, options.viewer);
 }
 
 /**
@@ -86,7 +104,10 @@ export async function listProjects(
  * actividad. El subárbol importa: un proyecto padre casi no tiene tareas
  * propias, las tiene en sus subproyectos.
  */
-async function decorate<T extends { id: string; path: string }>(projects: T[]) {
+async function decorate<T extends { id: string; path: string }>(
+  projects: T[],
+  viewer?: { role: string; userId: string },
+) {
   if (projects.length === 0) {
     return [] as Array<T & { rollup: TaskRollup; lastActivity: LastActivity | null; subtreeIds: string[] }>;
   }
@@ -97,6 +118,7 @@ async function decorate<T extends { id: string; path: string }>(projects: T[]) {
   const descendants = await db.project.findMany({
     where: {
       OR: projects.map((p) => ({ path: { startsWith: `${p.path}${p.id}/` } })),
+      ...projectAccess(viewer),
     },
     select: { id: true, path: true },
   });
@@ -171,9 +193,13 @@ async function lastActivityFor(projectIds: string[]) {
 }
 
 /** Proyecto completo, con ancestros para la miga de pan y subproyectos. */
-export async function getProject(workspaceId: string, projectId: string) {
+export async function getProject(
+  workspaceId: string,
+  projectId: string,
+  viewer?: { role: string; userId: string },
+) {
   const project = await db.project.findFirst({
-    where: { id: projectId, workspaceId },
+    where: { id: projectId, workspaceId, ...projectAccess(viewer) },
     select: {
       ...projectCardSelect,
       links: {
@@ -200,7 +226,7 @@ export async function getProject(workspaceId: string, projectId: string) {
           select: { id: true, name: true, path: true, accent: true },
         })
       : Promise.resolve([]),
-    listProjects(workspaceId, { parentId: projectId }),
+    listProjects(workspaceId, { parentId: projectId, viewer }),
     taskRollupByProject([projectId]),
   ]);
 
@@ -226,11 +252,16 @@ export async function getProject(workspaceId: string, projectId: string) {
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProject>>>;
 
 /** Árbol liviano para el sidebar y los selectores de proyecto. */
-export async function projectTree(workspaceId: string, includeArchived = false) {
+export async function projectTree(
+  workspaceId: string,
+  includeArchived = false,
+  viewer?: { role: string; userId: string },
+) {
   const rows = await db.project.findMany({
     where: {
       workspaceId,
       ...(includeArchived ? {} : { archivedAt: null }),
+      ...projectAccess(viewer),
     },
     select: {
       id: true,
@@ -242,6 +273,7 @@ export async function projectTree(workspaceId: string, includeArchived = false) 
       depth: true,
       position: true,
       coverUrl: true,
+      visibility: true,
     },
     orderBy: [{ depth: "asc" }, { position: "asc" }, { createdAt: "asc" }],
   });
@@ -272,8 +304,11 @@ export async function subtreeIds(projectId: string, path: string) {
 }
 
 /** Opciones planas con sangría, para selects de "mover a" o "crear en". */
-export async function projectOptions(workspaceId: string) {
-  const tree = await projectTree(workspaceId);
+export async function projectOptions(
+  workspaceId: string,
+  viewer?: { role: string; userId: string },
+) {
+  const tree = await projectTree(workspaceId, false, viewer);
   const out: Array<{ id: string; name: string; depth: number; accent: string }> = [];
   const walk = (nodes: ProjectNode[], depth: number) => {
     for (const node of nodes) {

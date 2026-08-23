@@ -17,8 +17,8 @@ export default async function WorkspaceLayout({
   const ctx = await requireWorkspace(slug);
 
   const [projects, options, members, counts, myOpenTasks] = await Promise.all([
-    projectTree(ctx.workspace.id),
-    projectOptions(ctx.workspace.id),
+    projectTree(ctx.workspace.id, false, { role: ctx.role, userId: ctx.user.id }),
+    projectOptions(ctx.workspace.id, { role: ctx.role, userId: ctx.user.id }),
     workspaceMembers(ctx.workspace.id),
     feedCounts(ctx.workspace.id, ctx.user.id, ctx.lastSeenAt),
     db.item.count({
@@ -44,7 +44,9 @@ export default async function WorkspaceLayout({
       canManage={ctx.can("workspace.manage")}
       projects={projects}
       projectOptions={options}
-      members={members.map((m) => m.user)}
+      members={members
+        .filter((member) => member.role !== "community")
+        .map((member) => member.user)}
       unread={counts.unread}
       myOpenTasks={myOpenTasks}
     >

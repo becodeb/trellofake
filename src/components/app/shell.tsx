@@ -104,6 +104,7 @@ export function AppShell({
           unread={unread}
           myOpenTasks={myOpenTasks}
           canManage={canManage}
+          canWork={role !== "community"}
           onSearch={() => setPaletteOpen(true)}
           onCreate={() => setCreateOpen(true)}
           onNavigate={() => setDrawerOpen(false)}
@@ -143,31 +144,37 @@ export function AppShell({
             <Menu className="size-4.5" strokeWidth={1.9} />
           </button>
           <span className="truncate text-sm font-medium text-ink">{workspaceName}</span>
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="ml-auto grid size-8 place-items-center rounded-[var(--r-md)] text-ink-2 transition-colors hover:bg-surface-2"
-            aria-label="Buscar"
-          >
-            <Search className="size-4" strokeWidth={1.9} />
-          </button>
+          {role !== "community" && (
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="ml-auto grid size-8 place-items-center rounded-[var(--r-md)] text-ink-2 transition-colors hover:bg-surface-2"
+              aria-label="Buscar"
+            >
+              <Search className="size-4" strokeWidth={1.9} />
+            </button>
+          )}
         </div>
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        slug={slug}
-        canManage={canManage}
-      />
-      <QuickCreate
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        slug={slug}
-        projects={projectOptions}
-        members={members}
-      />
+      {role !== "community" && (
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          slug={slug}
+          canManage={canManage}
+        />
+      )}
+      {role !== "community" && (
+        <QuickCreate
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          slug={slug}
+          projects={projectOptions}
+          members={members}
+        />
+      )}
     </div>
   );
 }

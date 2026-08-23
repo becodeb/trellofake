@@ -43,13 +43,18 @@ export default async function ProjectsPage({
       parentId: null,
       archived: false,
       statuses: filter.statuses,
+      viewer: { role: ctx.role, userId: ctx.user.id },
     }),
     workspaceMembers(ctx.workspace.id),
   ]);
 
   const children = await Promise.all(
     roots.map((root) =>
-      listProjects(ctx.workspace.id, { parentId: root.id, archived: false }),
+      listProjects(ctx.workspace.id, {
+        parentId: root.id,
+        archived: false,
+        viewer: { role: ctx.role, userId: ctx.user.id },
+      }),
     ),
   );
 

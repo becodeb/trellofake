@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Plus, TriangleAlert } from "lucide-react";
+import { ArrowRight, BookOpen, Lightbulb, Plus, TriangleAlert } from "lucide-react";
 
 import { requireWorkspace } from "@/server/auth/context";
 import { listProjects } from "@/server/domain/projects";
@@ -11,6 +11,7 @@ import {
   workspaceStats,
 } from "@/server/domain/dashboard";
 import { feedCounts, personalFeed } from "@/server/domain/feed";
+import { db } from "@/server/db";
 import { accentHex } from "@/lib/domain";
 import { firstName, longDate, relativeTime } from "@/lib/format";
 import { Page } from "@/components/app/shell";
@@ -40,10 +41,19 @@ export default async function DashboardPage({
   const ctx = await requireWorkspace(slug);
   const ws = ctx.workspace.id;
 
+  if (!ctx.can("content.write")) {
+    return <CommunityHome slug={slug} ctx={ctx} />;
+  }
+
   const [stats, projects, tasks, blocked, decisions, updates, counts, feed] =
     await Promise.all([
       workspaceStats(ws),
-      listProjects(ws, { statuses: ["active"], archived: false, parentId: null }),
+      listProjects(ws, {
+        statuses: ["active"],
+        archived: false,
+        parentId: null,
+        viewer: { role: ctx.role, userId: ctx.user.id },
+      }),
       myTasks(ws, ctx.user.id, { take: 30 }),
       blockedWork(ws, 4),
       recentDecisions(ws, 3),
@@ -255,6 +265,91 @@ export default async function DashboardPage({
             </section>
           )}
         </div>
+      </div>
+    </Page>
+  );
+}
+
+async function CommunityHome({
+  slug,
+  ctx,
+}: {
+  slug: string;
+  ctx: Awaited<ReturnType<typeof requireWorkspace>>;
+}) {
+  const viewer = { role: ctx.role, userId: ctx.user.id };
+  const [projects, proposalCount, latestProposals, resourceCount] = await Promise.all([
+    listProjects(ctx.workspace.id, {
+      statuses: ["active", "paused"],
+      archived: false,
+      parentId: null,
+      viewer,
+    }),
+    db.proposal.count({ where: { workspaceId: ctx.workspace.id } }),
+    db.proposal.findMany({
+      where: { workspaceId: ctx.workspace.id },
+      select: { id: true, title: true, status: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    }),
+    db.knowledgeResource.count({
+      where: { workspaceId: ctx.workspace.id, visibility: "community" },
+    }),
+  ]);
+
+  return (
+    <Page width="wide">
+      <header className="mb-7 max-w-3xl">
+        <p className="text-2xs font-medium uppercase tracking-[0.08em] text-ink-4">
+          Comunidad · {ctx.workspace.name}
+        </p>
+        <h1 className="mt-2 font-display text-4xl leading-[1.05] text-ink">
+          Lo que estamos construyendo, a la vista de todos.
+        </h1>
+        <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-ink-3">
+          Seguí el estado de los proyectos de la red, acercá una necesidad y dejá contexto
+          para que el equipo de desarrollo pueda convertirla en trabajo concreto.
+        </p>
+      </header>
+
+      <div className="mb-8 grid gap-3 sm:grid-cols-2">
+        <Link href={`/w/${slug}/ideas`} className="group rounded-[var(--r-lg)] border border-line bg-accent-wash p-4 transition-colors hover:border-accent-line">
+          <Lightbulb className="size-5 text-accent-ink" strokeWidth={1.8} />
+          <p className="mt-3 text-base font-semibold text-ink">Proponer o conversar una idea</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-3">{proposalCount} propuestas compartidas. Las ideas aceptadas se vinculan o se convierten en proyectos.</p>
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-ink">Ir al buzón <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
+        </Link>
+        <Link href={`/w/${slug}/recursos`} className="group rounded-[var(--r-lg)] border border-line bg-surface p-4 transition-colors hover:border-line-strong">
+          <BookOpen className="size-5 text-ink-3" strokeWidth={1.8} />
+          <p className="mt-3 text-base font-semibold text-ink">Reutilizar recursos de la red</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-3">{resourceCount} recursos con enlaces e instrucciones de acceso para evitar empezar de cero.</p>
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-ink-2">Abrir biblioteca <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
+        </Link>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section>
+          <SectionHeader title="Proyectos visibles" count={projects.length} />
+          {projects.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {projects.map((project) => <ProjectCard key={project.id} project={project} slug={slug} />)}
+            </div>
+          ) : (
+            <EmptyState compact title="No hay proyectos publicados" description="El equipo define qué proyectos comparte con la comunidad." />
+          )}
+        </section>
+        <section>
+          <SectionHeader title="Ideas recientes" />
+          <div className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
+            {latestProposals.map((proposal) => (
+              <Link key={proposal.id} href={`/w/${slug}/ideas`} className="row hairline block px-3 py-2.5">
+                <p className="text-sm font-medium text-ink">{proposal.title}</p>
+                <p className="mt-1 text-2xs text-ink-4">{relativeTime(proposal.createdAt)}</p>
+              </Link>
+            ))}
+            {latestProposals.length === 0 && <p className="px-3 py-4 text-xs text-ink-4">Todavía no hay propuestas.</p>}
+          </div>
+        </section>
       </div>
     </Page>
   );

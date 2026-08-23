@@ -2,7 +2,18 @@ import * as React from "react";
 import Link from "next/link";
 
 import { cn } from "@/lib/cn";
-import { ACTIVITY, ITEM_TYPE_META, PRIORITY_META, accentHex, statusMeta, type ItemType, type Priority } from "@/lib/domain";
+import {
+  ACTIVITY,
+  ITEM_TYPE_META,
+  PRIORITY_META,
+  PROPOSAL_STATUS_LABEL,
+  ROLE_LABEL,
+  accentHex,
+  statusMeta,
+  type ItemType,
+  type Priority,
+  type ProposalStatus,
+} from "@/lib/domain";
 import { dayHeading, relativeTime, timeOfDay } from "@/lib/format";
 import { groupByDay, type ActivityEvent } from "@/lib/shared";
 import { Avatar } from "@/components/ui/avatar";
@@ -45,6 +56,16 @@ function Target({
   event: ActivityEvent;
   slug: string;
 }) {
+  if (event.targetType === "proposal" || event.targetType === "resource") {
+    return (
+      <Link
+        href={`/w/${slug}/${event.targetType === "proposal" ? "ideas" : "recursos"}`}
+        className="font-medium text-ink decoration-line-strong underline-offset-2 hover:underline"
+      >
+        {event.targetLabel}
+      </Link>
+    );
+  }
   const projectId = event.item?.projectId ?? event.project?.id;
   if (!projectId) return <Strong>{event.targetLabel}</Strong>;
 
@@ -135,6 +156,25 @@ export function describe(
 
     case ACTIVITY.linkRemoved:
       return <>quitó el recurso {target}</>;
+
+    case ACTIVITY.resourceAdded:
+      return <>compartió el recurso {target}</>;
+
+    case ACTIVITY.proposalCreated:
+      return <>propuso {target}</>;
+
+    case ACTIVITY.proposalReplied:
+      return <>respondió en la propuesta {target}</>;
+
+    case ACTIVITY.proposalTriaged:
+      return (
+        <>
+          pasó la propuesta {target} a{" "}
+          <Strong>
+            {PROPOSAL_STATUS_LABEL[meta.status as ProposalStatus] ?? String(meta.status)}
+          </Strong>
+        </>
+      );
 
     case ACTIVITY.itemCreated:
       return (
@@ -264,7 +304,7 @@ export function describe(
       return (
         <>
           cambió el rol de <Strong>{event.targetLabel}</Strong> a{" "}
-          <Strong>{meta.to === "admin" ? "Admin" : "Miembro"}</Strong>
+          <Strong>{ROLE_LABEL[String(meta.to)] ?? String(meta.to)}</Strong>
         </>
       );
 

@@ -8,7 +8,14 @@ import { requireWorkspaceAction } from "@/server/auth/context";
 import { recordActivity } from "@/server/domain/activity";
 import { refreshProject } from "@/server/domain/progress";
 import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
-import { ACTIVITY, PRIORITIES, PROJECT_STATUSES, accentFromId, ACCENTS } from "@/lib/domain";
+import {
+  ACTIVITY,
+  PRIORITIES,
+  PROJECT_STATUSES,
+  PROJECT_VISIBILITIES,
+  accentFromId,
+  ACCENTS,
+} from "@/lib/domain";
 import { detectLinkKind, normalizeUrl, suggestLabel } from "@/lib/links";
 
 const optionalDate = z
@@ -28,6 +35,7 @@ const createSchema = z.object({
   targetDate: optionalDate,
   memberIds: z.array(z.string()).default([]),
   coverUrl: z.string().trim().optional(),
+  visibility: z.enum(PROJECT_VISIBILITIES).optional(),
 });
 
 export async function createProject(
@@ -41,14 +49,16 @@ export async function createProject(
     // La ruta materializada del hijo se arma con la del padre: path + id.
     let path = "/";
     let depth = 0;
+    let parentVisibility: string | null = null;
     if (input.parentId) {
       const parent = await db.project.findFirst({
         where: { id: input.parentId, workspaceId: ctx.workspace.id },
-        select: { id: true, path: true, depth: true },
+        select: { id: true, path: true, depth: true, visibility: true },
       });
       if (!parent) throw new Error("El proyecto padre no existe.");
       path = `${parent.path}${parent.id}/`;
       depth = parent.depth + 1;
+      parentVisibility = parent.visibility;
     }
 
     const last = await db.project.findFirst({
@@ -74,6 +84,7 @@ export async function createProject(
         position: (last?.position ?? 0) + 1,
         createdById: ctx.user.id,
         accent: input.accent ?? accentFromId(`${ctx.workspace.id}${input.name}`),
+        visibility: input.visibility ?? parentVisibility ?? "team",
         members: {
           create: members.map((userId) => ({
             userId,
@@ -109,6 +120,7 @@ const updateSchema = z.object({
   startDate: optionalDate.optional(),
   targetDate: optionalDate.optional(),
   coverUrl: z.string().trim().nullable().optional(),
+  visibility: z.enum(PROJECT_VISIBILITIES).optional(),
 });
 
 export async function updateProject(
@@ -117,7 +129,7 @@ export async function updateProject(
   raw: unknown,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug);
+    const ctx = await requireWorkspaceAction(slug, "project.manage");
     const input = updateSchema.parse(raw);
 
     const before = await db.project.findFirstOrThrow({
@@ -135,6 +147,7 @@ export async function updateProject(
         ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
         ...(input.targetDate !== undefined ? { targetDate: input.targetDate } : {}),
         ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
+        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
       },
       select: { id: true, name: true },
     });
@@ -145,6 +158,7 @@ export async function updateProject(
     if (input.description !== undefined) changed.push("descripción");
     if (input.targetDate !== undefined) changed.push("fecha estimada");
     if (input.coverUrl !== undefined) changed.push("portada");
+    if (input.visibility !== undefined) changed.push("visibilidad");
 
     await recordActivity({
       workspaceId: ctx.workspace.id,
@@ -172,7 +186,7 @@ export async function setProjectStatus(
   status: string,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug);
+    const ctx = await requireWorkspaceAction(slug, "project.manage");
     const parsed = z.enum(PROJECT_STATUSES).parse(status);
 
     const before = await db.project.findFirstOrThrow({
@@ -259,7 +273,7 @@ export async function setProjectProgress(
   mode: "auto" | "manual",
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug);
+    const ctx = await requireWorkspaceAction(slug, "project.manage");
     const project = await db.project.findFirstOrThrow({
       where: { id: projectId, workspaceId: ctx.workspace.id },
       select: { name: true, progress: true },
@@ -296,7 +310,7 @@ export async function setProjectMembers(
   userIds: string[],
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug);
+    const ctx = await requireWorkspaceAction(slug, "project.manage");
     const project = await db.project.findFirstOrThrow({
       where: { id: projectId, workspaceId: ctx.workspace.id },
       select: { name: true, members: { select: { userId: true } } },

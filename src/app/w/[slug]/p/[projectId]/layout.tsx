@@ -16,7 +16,10 @@ export async function generateMetadata({
 }) {
   const { slug, projectId } = await params;
   const ctx = await requireWorkspace(slug);
-  const project = await getProject(ctx.workspace.id, projectId);
+  const project = await getProject(ctx.workspace.id, projectId, {
+    role: ctx.role,
+    userId: ctx.user.id,
+  });
   return { title: project?.name ?? "Proyecto" };
 }
 
@@ -39,13 +42,15 @@ export default async function ProjectLayout({
   const ctx = await requireWorkspace(slug);
 
   const [project, members] = await Promise.all([
-    getProject(ctx.workspace.id, projectId),
+    getProject(ctx.workspace.id, projectId, { role: ctx.role, userId: ctx.user.id }),
     workspaceMembers(ctx.workspace.id),
   ]);
 
   if (!project) notFound();
 
-  const people = members.map((m) => m.user);
+  const people = members
+    .filter((member) => member.role !== "community")
+    .map((member) => member.user);
 
   return (
     <div className="min-w-0">
@@ -93,6 +98,7 @@ export default async function ProjectLayout({
             children: project.children.length,
             files: project._count.attachments,
           }}
+          canWork={ctx.can("content.write")}
         />
 
         <div className="pb-12 pt-5">{children}</div>

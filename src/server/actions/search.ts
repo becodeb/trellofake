@@ -8,6 +8,6 @@ export async function quickSearch(
   slug: string,
   query: string,
 ): Promise<SearchHit[]> {
-  const ctx = await requireWorkspaceAction(slug);
+  const ctx = await requireWorkspaceAction(slug, "content.write");
   return search(ctx.workspace.id, slug, query, { limit: 20 });
 }
