@@ -16,7 +16,7 @@ services:
       - node_modules:/app/node_modules
       - hilo-data:/app/data
       - hilo-storage:/app/storage
-    command: ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+    command: ["npm", "run", "dev", "--", "--turbopack", "-H", "0.0.0.0"]
 
 volumes:
   node_modules:
