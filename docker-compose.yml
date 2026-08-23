@@ -1,0 +1,24 @@
+name: hilo
+
+services:
+  app:
+    build: .
+    container_name: hilo-app
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: file:/app/data/dev.db
+      STORAGE_DIR: /app/storage
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - hilo-data:/app/data
+      - hilo-storage:/app/storage
+    command: ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+
+volumes:
+  node_modules:
+  hilo-data:
+  hilo-storage:

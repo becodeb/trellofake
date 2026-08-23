@@ -1,0 +1,35 @@
+name: hilo-prod
+
+services:
+  app:
+    build: .
+    container_name: hilo-app-prod
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/app/data/prod.db
+      STORAGE_DIR: /app/storage
+    volumes:
+      - hilo-data:/app/data
+      - hilo-storage:/app/storage
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hilo-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  hilo-data:
+  hilo-storage:
+  caddy-data:
+  caddy-config:
