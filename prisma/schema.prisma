@@ -35,6 +35,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   sessions        Session[]
+  apiTokens       ApiToken[]
   memberships     Membership[]
   projectSeats    ProjectMember[]
   createdItems    Item[]              @relation("ItemAuthor")
@@ -63,6 +64,23 @@ model Session {
   @@index([expiresAt])
 }
 
+/// Token de acceso API para clientes MCP. `id` es el hash sha256 del token
+/// crudo (mismo patrón que Session: el valor viajero nunca se persiste).
+model ApiToken {
+  id          String   @id
+  workspaceId String
+  userId      String
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([userId])
+}
+
 // --------------------------------------------------------------- workspace
 
 model Workspace {
@@ -74,6 +92,7 @@ model Workspace {
   updatedAt DateTime @updatedAt
 
   members     Membership[]
+  apiTokens   ApiToken[]
   projects    Project[]
   items       Item[]
   comments    Comment[]

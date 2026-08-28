@@ -34,6 +34,8 @@ export const CAPABILITIES = [
   "comment.write",
   "proposal.manage",
   "resource.manage",
+  "api-tokens.create",
+  "api-tokens.revoke",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
