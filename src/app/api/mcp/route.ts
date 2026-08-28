@@ -14,12 +14,6 @@ import { getTokenContext } from "@/server/auth/token";
  */
 export const runtime = "nodejs";
 
-const server = new McpServer(
-  { name: "hilo-mcp", version: "0.1.0" },
-  { capabilities: { tools: {} } },
-);
-registerTools(server);
-
 /** Sesiones activas por Mcp-Session-Id (en memoria, por proceso). */
 const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
 
@@ -87,12 +81,21 @@ function sessionNotFound() {
  * Crea (o reutiliza) el transporte de la sesión. El primero que se conecta
  * sin `Mcp-Session-Id` debe ser `initialize`: el transporte asigna el id y lo
  * registramos vía `onsessioninitialized` para los requests siguientes.
+ *
+ * El protocolo del SDK admite UNA conexión por instancia, así que cada sesión
+ * tiene su propio `McpServer` (registrar las 9 herramientas es barato).
  */
 function transportFor(request: Request): WebStandardStreamableHTTPServerTransport | null {
   const sessionId = request.headers.get("mcp-session-id");
   if (sessionId) {
     return sessions.get(sessionId) ?? null;
   }
+
+  const server = new McpServer(
+    { name: "hilo-mcp", version: "0.1.0" },
+    { capabilities: { tools: {} } },
+  );
+  registerTools(server);
 
   let transport: WebStandardStreamableHTTPServerTransport | undefined;
   transport = new WebStandardStreamableHTTPServerTransport({
