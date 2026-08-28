@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { Page } from "@/components/app/shell";
 import { WorkspaceSettings } from "@/components/app/workspace-settings";
 import { MemberList } from "@/components/app/member-list";
+import { ApiTokens } from "@/components/app/api-tokens";
 import { PageHeader, SectionHeader } from "@/components/ui/layout";
 
 export const metadata = { title: "Ajustes" };
@@ -19,13 +20,18 @@ export default async function SettingsPage({
   const ctx = await requireWorkspace(slug);
   if (!ctx.can("workspace.manage")) notFound();
 
-  const [members, counts] = await Promise.all([
+  const [members, counts, tokens] = await Promise.all([
     workspaceMembers(ctx.workspace.id),
     Promise.all([
       db.project.count({ where: { workspaceId: ctx.workspace.id } }),
       db.item.count({ where: { workspaceId: ctx.workspace.id } }),
       db.activity.count({ where: { workspaceId: ctx.workspace.id } }),
     ]),
+    db.apiToken.findMany({
+      where: { workspaceId: ctx.workspace.id },
+      select: { id: true, expiresAt: true, revoked: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const [projects, items, events] = counts;
@@ -50,6 +56,11 @@ export default async function SettingsPage({
         <section>
           <SectionHeader title="Gente" count={members.length} />
           <MemberList slug={slug} members={members} viewerId={ctx.user.id} />
+        </section>
+
+        <section>
+          <SectionHeader title="Acceso por API" />
+          <ApiTokens slug={slug} tokens={tokens} />
         </section>
 
         <section>
