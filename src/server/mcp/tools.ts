@@ -122,14 +122,19 @@ export function registerTools(server: McpServer) {
     ) => {
       const c = ctx();
       const teamView = isTeamRole(c.role);
+      const viewer = { role: c.role, userId: c.user.id };
 
       let projectIds: string[] | undefined;
       if (args.projectId) {
-        if (teamView || (await visibleProjectIds(c.workspace.id, { role: c.role, userId: c.user.id })).has(args.projectId)) {
+        if (teamView || (await visibleProjectIds(c.workspace.id, viewer)).has(args.projectId)) {
           projectIds = [args.projectId];
         } else {
           projectIds = [];
         }
+      } else if (!teamView) {
+        // Sin projectId y rol no-team: acotar a los proyectos visibles (D1),
+        // mismo patrón que hilo_get_feed para comunidad.
+        projectIds = Array.from(await visibleProjectIds(c.workspace.id, viewer));
       }
 
       const rows = await listItems(c.workspace.id, {
