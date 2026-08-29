@@ -9,11 +9,10 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && npm run db:seed",
+    "db:reset": "rm -f prisma/dev.db && npm run setup",
     "db:studio": "prisma studio",
-    "setup": "prisma generate && prisma db push && npm run db:seed"
+    "setup": "prisma generate && npx prisma migrate deploy && npm run db:seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

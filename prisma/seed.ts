@@ -31,6 +31,11 @@ const db = new PrismaClient();
 
 const PASSWORD = "hilo1234";
 
+/** Id del Team: se usa como prefijo de las claves de storage. */
+const TEAM_ID = process.env.TEAM_ID ?? "hilo";
+/** Slug del equipo: el que la verificación espera en la URL raíz. */
+const TEAM_SLUG = process.env.TEAM_SLUG ?? "hilo";
+
 // ---------------------------------------------------------------- utilidades
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -84,7 +89,7 @@ async function main() {
   await db.project.deleteMany();
   await db.membership.deleteMany();
   await db.session.deleteMany();
-  await db.workspace.deleteMany();
+  await db.team.deleteMany();
   await db.user.deleteMany();
 
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
@@ -121,23 +126,24 @@ async function main() {
     },
   });
 
-  const workspace = await db.workspace.create({
+  const team = await db.team.create({
     data: {
+      id: TEAM_ID,
       name: "Red Educativa Cardinal",
-      slug: "cardinal",
+      slug: TEAM_SLUG,
       mission: "Construimos y conectamos herramientas digitales para toda la comunidad educativa.",
-      members: {
-        create: [
-          { userId: eze.id, role: "admin", title: "Producto", lastSeenAt: ago(2, 19) },
-          { userId: juan.id, role: "developer", title: "Backend", lastSeenAt: ago(0, 9) },
-          { userId: vale.id, role: "developer", title: "Diseño UX", lastSeenAt: ago(1, 17) },
-          { userId: alma.id, role: "community", title: "Coordinación académica", lastSeenAt: ago(0, 15) },
-        ],
-      },
     },
   });
 
-  const ws = workspace.id;
+  const memberships = [
+    { userId: eze.id, role: "admin", title: "Producto", lastSeenAt: ago(2, 19) },
+    { userId: juan.id, role: "developer", title: "Backend", lastSeenAt: ago(0, 9) },
+    { userId: vale.id, role: "developer", title: "Diseño UX", lastSeenAt: ago(1, 17) },
+    { userId: alma.id, role: "community", title: "Coordinación académica", lastSeenAt: ago(0, 15) },
+  ];
+  await db.membership.createMany({
+    data: memberships.map((m) => ({ ...m })),
+  });
 
   // --------------------------------------------------------------- proyectos
 
@@ -146,7 +152,7 @@ async function main() {
   async function project(input: {
     name: string;
     description?: string;
-    parent?: { id: string; path: string; depth: number; visibility: string } | null;
+    parent?: { id: string; path: string; depth: number } | null;
     status?: string;
     priority?: string;
     accent?: string;
@@ -158,19 +164,16 @@ async function main() {
     createdBy: string;
     createdAt: Date;
     position: number;
-    visibility?: string;
   }) {
     const parent = input.parent ?? null;
     const created = await db.project.create({
       data: {
-        workspaceId: ws,
         parentId: parent?.id ?? null,
         path: parent ? `${parent.path}${parent.id}/` : "/",
         depth: parent ? parent.depth + 1 : 0,
         name: input.name,
         description: input.description ?? null,
         accent: input.accent ?? accentFromId(input.name),
-        visibility: input.visibility ?? parent?.visibility ?? "team",
         status: input.status ?? "active",
         priority: input.priority ?? "medium",
         startDate: input.start ?? null,
@@ -215,7 +218,6 @@ async function main() {
     createdBy: eze.id,
     createdAt: ago(38, 9, 20),
     position: 1,
-    visibility: "community",
   });
 
   const lumenFront = await project({
@@ -272,7 +274,6 @@ async function main() {
     createdBy: vale.id,
     createdAt: ago(16, 10),
     position: 2,
-    visibility: "community",
   });
 
   const rondaDiseno = await project({
@@ -360,7 +361,6 @@ async function main() {
   await db.knowledgeResource.createMany({
     data: [
       {
-        workspaceId: ws,
         addedById: juan.id,
         name: "Directorio institucional de personas",
         summary: "Base central con personal, áreas, sedes y datos de contacto institucionales.",
@@ -368,10 +368,8 @@ async function main() {
         url: "https://datos.cardinal.edu.ar/directorio",
         accessGuide:
           "Solicitar acceso de solo lectura al área de Sistemas. Para integrar una aplicación, pedir una cuenta de servicio; no usar cuentas personales.",
-        visibility: "community",
       },
       {
-        workspaceId: ws,
         projectId: lumenBack.id,
         addedById: juan.id,
         name: "API de catálogo y stock",
@@ -395,24 +393,20 @@ async function main() {
           "- Cachear la respuesta durante 60 segundos.",
           "- Ante un 429, reintentar con espera incremental.",
         ].join("\n"),
-        visibility: "community",
       },
       {
-        workspaceId: ws,
         addedById: vale.id,
         name: "Biblioteca de diseños de la red",
         summary: "Componentes, pantallas de referencia y archivos editables para nuevas aplicaciones.",
         kind: "design",
         url: "https://figma.com/file/cardinal-education-system",
         accessGuide: "Cualquier integrante puede ver. Pedir permiso de edición al equipo de Diseño.",
-        visibility: "community",
       },
     ],
   });
 
   const proposal = await db.proposal.create({
     data: {
-      workspaceId: ws,
       authorId: alma.id,
       title: "Unificar los tickets de TICS y Mantenimiento",
       body:
@@ -434,7 +428,6 @@ async function main() {
 
   await db.proposal.create({
     data: {
-      workspaceId: ws,
       authorId: alma.id,
       title: "Avisos de avance para quienes propusieron una mejora",
       body:
@@ -807,7 +800,6 @@ async function main() {
 
     const item = await db.item.create({
       data: {
-        workspaceId: ws,
         projectId: spec.project,
         type: spec.type,
         title: spec.title,
@@ -871,7 +863,6 @@ async function main() {
       const at = new Date(spec.createdAt.getTime() + (index + 1) * DAY * 0.6);
       const sub = await db.item.create({
         data: {
-          workspaceId: ws,
           projectId: spec.project,
           parentId: item.id,
           type: "task",
@@ -1048,7 +1039,6 @@ async function main() {
 
     const comment = await db.comment.create({
       data: {
-        workspaceId: ws,
         authorId: line.author,
         itemId: target.id,
         body: line.body,
@@ -1113,14 +1103,13 @@ async function main() {
     itemId?: string;
     at: Date;
   }) {
-    const key = `${ws}/${randomBytes(8).toString("hex")}.png`;
+    const key = `${TEAM_ID}/${randomBytes(8).toString("hex")}.png`;
     const target = path.join(storageRoot, key);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, input.bytes);
 
     const attachment = await db.attachment.create({
       data: {
-        workspaceId: ws,
         uploaderId: input.uploaderId,
         filename: input.filename,
         mimeType: "image/png",
@@ -1224,7 +1213,6 @@ async function main() {
   for (const e of events) {
     const activity = await db.activity.create({
       data: {
-        workspaceId: ws,
         actorId: e.actorId,
         verb: e.verb,
         projectId: e.projectId ?? null,
@@ -1262,7 +1250,6 @@ async function main() {
       data: Array.from(audience, ([userId, reason]) => ({
         userId,
         activityId: activity.id,
-        workspaceId: ws,
         reason,
         direct: reason === "mentioned" || reason === "assigned" || reason === "reply",
         // Lo de los últimos tres días queda sin leer: hay novedades al entrar.
@@ -1287,7 +1274,7 @@ async function main() {
 
   console.log("\nListo.\n");
   console.table(counts);
-  console.log(`\nEntrá en http://localhost:3000/login\n`);
+  console.log(`\nEntrá en http://localhost:3000/\n`);
   console.log(`  ezequiel@fernandezcruz.com.ar   ${PASSWORD}   (admin)`);
   console.log(`  juan@cardinal.studio            ${PASSWORD}`);
   console.log(`  valentina@cardinal.studio       ${PASSWORD}`);

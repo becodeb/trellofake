@@ -12,6 +12,9 @@
 //  4. Sin enums nativos: strings validados en el dominio (src/lib/domain.ts).
 //     Permite agregar estados/roles sin migracion y mantiene el schema portable
 //     entre SQLite (dev) y PostgreSQL (produccion).
+//  5. Una instancia = un equipo (`Team`). No hay multitenancy: `Team` reutiliza
+//     el id del workspace historico (las claves de storage y los ApiToken no
+//     cambian) y `Membership` es global (`@@unique([userId])`).
 
 generator client {
   provider = "prisma-client-js"
@@ -66,57 +69,47 @@ model Session {
 
 /// Token de acceso API para clientes MCP. `id` es el hash sha256 del token
 /// crudo (mismo patrón que Session: el valor viajero nunca se persiste).
+/// No guarda teamId: con un solo equipo por instancia, el token + la
+/// membership global resuelven el contexto.
 model ApiToken {
-  id          String   @id
-  workspaceId String
-  userId      String
-  expiresAt   DateTime
-  revoked     Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([workspaceId])
   @@index([userId])
 }
 
-// --------------------------------------------------------------- workspace
+// ---------------------------------------------------------------- el equipo
 
-model Workspace {
+/// El único equipo de la instancia. `id` es el id del workspace histórico:
+/// las claves de storage (`<teamId>/<hash>`) y los ApiToken conservan su
+/// valor sin ninguna migración de datos extra.
+model Team {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
   mission   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  members     Membership[]
-  apiTokens   ApiToken[]
-  projects    Project[]
-  items       Item[]
-  comments    Comment[]
-  attachments Attachment[]
-  activities  Activity[]
-  feed        FeedEntry[]
-  proposals   Proposal[]
-  knowledge   KnowledgeResource[]
 }
 
 /// role: "admin" | "developer" | "community".
+/// Una fila por usuario: el rol aplica a todo el equipo.
 model Membership {
-  id          String    @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        String    @default("community")
-  title       String?
-  joinedAt    DateTime  @default(now())
-  lastSeenAt  DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  role       String   @default("community")
+  title      String?
+  joinedAt   DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, workspaceId])
-  @@index([workspaceId, role])
+  @@unique([userId])
+  @@index([role])
 }
 
 // --------------------------------------------------------------- proyectos
@@ -125,19 +118,15 @@ model Membership {
 /// `path` es la ruta materializada de ancestros ("/rootId/parentId/") para
 /// consultar un subarbol completo con un solo startsWith.
 model Project {
-  id          String  @id @default(cuid())
-  workspaceId String
-  parentId    String?
-  path        String  @default("/")
-  depth       Int     @default(0)
+  id        String  @id @default(cuid())
+  parentId  String?
+  path      String  @default("/")
+  depth     Int     @default(0)
 
   name        String
   description String?
   coverUrl    String?
   accent      String  @default("clay")
-
-  /// "community" (visible para toda la red) | "team" (solo desarrollo).
-  visibility String @default("team")
 
   /// "active" | "paused" | "done" | "cancelled"
   status String @default("active")
@@ -159,7 +148,6 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   parent    Project?  @relation("ProjectTree", fields: [parentId], references: [id], onDelete: Cascade)
   children  Project[] @relation("ProjectTree")
   createdBy User      @relation("ProjectAuthor", fields: [createdById], references: [id])
@@ -174,8 +162,8 @@ model Project {
   promotedProposals Proposal[]          @relation("ProposalPromotion")
   knowledge         KnowledgeResource[]
 
-  @@index([workspaceId, status, archivedAt])
-  @@index([workspaceId, parentId])
+  @@index([status, archivedAt])
+  @@index([parentId])
   @@index([path])
 }
 
@@ -198,11 +186,10 @@ model ProjectMember {
 /// Seis tipos, una tabla. `type` decide que campos se muestran y que estados
 /// son validos; el resto (comentarios, adjuntos, actividad) es comun.
 model Item {
-  id          String  @id @default(cuid())
-  workspaceId String
-  projectId   String
+  id        String  @id @default(cuid())
+  projectId String
   /// Subtareas: un Item hijo de otro Item.
-  parentId    String?
+  parentId  String?
 
   /// "task" | "idea" | "note" | "problem" | "decision" | "update"
   type  String
@@ -216,7 +203,7 @@ model Item {
   priority String    @default("medium")
   dueDate  DateTime?
 
-  /// "individual" (usa ItemAssignment) | "team" (todo el workspace)
+  /// "individual" (usa ItemAssignment) | "team" (todo el equipo)
   assigneeScope String @default("individual")
 
   /// "auto" (derivado de subtareas / estado) | "manual"
@@ -232,7 +219,6 @@ model Item {
   /// Trazabilidad cuando una idea se convierte en tarea.
   convertedFromId String?
 
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent      Item?            @relation("ItemTree", fields: [parentId], references: [id], onDelete: Cascade)
   children    Item[]           @relation("ItemTree")
@@ -244,9 +230,9 @@ model Item {
   activities  Activity[]
 
   @@index([projectId, type, status])
-  @@index([workspaceId, type, status])
+  @@index([type, status])
   @@index([parentId])
-  @@index([workspaceId, dueDate])
+  @@index([dueDate])
 }
 
 /// `weight` = porcentaje de colaboracion de esa persona en la tarea (0-100).
@@ -270,27 +256,24 @@ model ItemAssignment {
 // ----------------------------------------------------- comentarios y menciones
 
 model Comment {
-  id          String    @id @default(cuid())
-  workspaceId String
-  authorId    String
+  id        String    @id @default(cuid())
+  authorId  String
   /// Un comentario cuelga de un Item o de un Project (nunca de ambos).
-  itemId      String?
-  projectId   String?
-  body        String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  editedAt    DateTime?
+  itemId    String?
+  projectId String?
+  body      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  editedAt  DateTime?
 
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  item        Item?        @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  mentions    Mention[]
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  item      Item?        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  project   Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mentions  Mention[]
   attachments Attachment[]
 
   @@index([itemId, createdAt])
   @@index([projectId, createdAt])
-  @@index([workspaceId, createdAt])
 }
 
 model Mention {
@@ -311,7 +294,6 @@ model Mention {
 
 model Attachment {
   id          String @id @default(cuid())
-  workspaceId String
   uploaderId  String
 
   filename   String
@@ -329,15 +311,14 @@ model Attachment {
   commentId String?
   createdAt DateTime @default(now())
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  uploader  User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  item      Item?     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  comment   Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploader User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item     Item?     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  comment  Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
   @@index([itemId])
-  @@index([workspaceId, kind])
+  @@index([kind])
 }
 
 /// Links libres del proyecto (GitHub, Figma, Drive, staging, docs...).
@@ -363,26 +344,24 @@ model ResourceLink {
 /// Entrada liviana al trabajo del equipo. Una propuesta puede conversarse,
 /// vincularse a un proyecto existente o convertirse en un proyecto nuevo.
 model Proposal {
-  id          String @id @default(cuid())
-  workspaceId String
-  authorId    String
-  title       String
-  body        String
-  category    String @default("project")
-  status      String @default("proposed")
+  id        String @id @default(cuid())
+  authorId  String
+  title     String
+  body      String
+  category  String @default("project")
+  status    String @default("proposed")
 
   targetProjectId   String?
   promotedProjectId String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   author          User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
   targetProject   Project?        @relation("ProposalTarget", fields: [targetProjectId], references: [id], onDelete: SetNull)
   promotedProject Project?        @relation("ProposalPromotion", fields: [promotedProjectId], references: [id], onDelete: SetNull)
   replies         ProposalReply[]
 
-  @@index([workspaceId, status, createdAt])
+  @@index([status, createdAt])
   @@index([targetProjectId])
 }
 
@@ -401,11 +380,10 @@ model ProposalReply {
 
 // -------------------------------------------- recursos e interoperabilidad
 
-/// Recurso compartido de la red. Puede pertenecer a todo el workspace o a un
+/// Recurso compartido de la red. Puede pertenecer a todo el equipo o a un
 /// proyecto. Las guías API aceptan Markdown pegado o una fuente remota.
 model KnowledgeResource {
   id          String  @id @default(cuid())
-  workspaceId String
   projectId   String?
   addedById   String
 
@@ -416,16 +394,14 @@ model KnowledgeResource {
   accessGuide String?
   markdown    String?
   markdownUrl String?
-  visibility  String  @default("community")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  addedBy   User      @relation(fields: [addedById], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy User     @relation(fields: [addedById], references: [id])
 
-  @@index([workspaceId, visibility, kind])
+  @@index([kind])
   @@index([projectId, kind])
 }
 
@@ -434,9 +410,8 @@ model KnowledgeResource {
 /// Evento inmutable. `targetLabel` se desnormaliza para que el historial siga
 /// siendo legible aunque el elemento original se renombre o se borre.
 model Activity {
-  id          String @id @default(cuid())
-  workspaceId String
-  actorId     String
+  id      String @id @default(cuid())
+  actorId String
 
   /// ver ACTIVITY en src/lib/domain.ts (p. ej. "item.status_changed")
   verb String
@@ -452,13 +427,12 @@ model Activity {
   meta      String?
   createdAt DateTime @default(now())
 
-  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  actor     User        @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  project   Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  item      Item?       @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  entries   FeedEntry[]
+  actor   User        @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  project Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item    Item?       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  entries FeedEntry[]
 
-  @@index([workspaceId, createdAt])
+  @@index([createdAt])
   @@index([projectId, createdAt])
   @@index([itemId, createdAt])
 }
@@ -466,10 +440,9 @@ model Activity {
 /// Fan-out en escritura: una fila por (usuario, evento relevante).
 /// `reason` explica por que le llega y `direct` marca si es notificacion.
 model FeedEntry {
-  id          String @id @default(cuid())
-  userId      String
-  activityId  String
-  workspaceId String
+  id         String @id @default(cuid())
+  userId     String
+  activityId String
 
   /// "assigned" | "mentioned" | "reply" | "author" | "participant"
   reason    String
@@ -477,11 +450,10 @@ model FeedEntry {
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activity  Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@unique([userId, activityId])
-  @@index([userId, workspaceId, createdAt])
+  @@index([userId, createdAt])
   @@index([userId, readAt])
 }
