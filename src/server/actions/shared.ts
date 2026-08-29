@@ -50,7 +50,7 @@ export async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
     }
     if (error instanceof Error) {
       if (error.message === "UNAUTHENTICATED") {
-        return { ok: false, error: "Tu sesión expiró. Volvé a entrar." };
+        return { ok: false, error: "Necesitás iniciar sesión para hacer esto." };
       }
       return { ok: false, error: error.message };
     }
@@ -58,7 +58,7 @@ export async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   }
 }
 
-/** Refresca las vistas que dependen de un workspace. */
-export function revalidateWorkspace(slug: string) {
-  revalidatePath(`/w/${slug}`, "layout");
+/** Refresca las vistas que dependen del equipo (la app vive en la raíz). */
+export function revalidateTeam() {
+  revalidatePath("/", "layout");
 }

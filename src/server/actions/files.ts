@@ -1,12 +1,10 @@
 "use server";
-
 import { db } from "@/server/db";
-import { requireWorkspaceAction } from "@/server/auth/context";
+import { requireTeamAction } from "@/server/auth/context";
 import { recordActivity } from "@/server/domain/activity";
 import { put, urlFor } from "@/server/storage";
-import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
+import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import { ACTIVITY } from "@/lib/domain";
-
 export type UploadedFile = {
   id: string;
   filename: string;
@@ -20,42 +18,35 @@ export type UploadedFile = {
  * Sube archivos y los asocia a un proyecto, a un elemento o a nada todavía
  * (el caso del comentario que aún no existe: se adjuntan al publicarlo).
  */
+
 export async function uploadFiles(
-  slug: string,
   formData: FormData,
 ): Promise<ActionResult<UploadedFile[]>> {
   return run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
-
+    const ctx = await requireTeamAction("content.write");
     const projectId = (formData.get("projectId") as string | null) || null;
     const itemId = (formData.get("itemId") as string | null) || null;
     const files = formData.getAll("files").filter((f): f is File => f instanceof File);
-
     if (files.length === 0) throw new Error("No llegó ningún archivo.");
     if (files.length > 10) throw new Error("Máximo 10 archivos por vez.");
-
-    // Nunca confiar en los ids del cliente: se validan contra el workspace.
+    // Nunca confiar en los ids del cliente: se validan contra la base.
     const project = projectId
       ? await db.project.findFirst({
-          where: { id: projectId, workspaceId: ctx.workspace.id },
+          where: { id: projectId },
           select: { id: true, name: true },
         })
       : null;
-
     const item = itemId
       ? await db.item.findFirst({
-          where: { id: itemId, workspaceId: ctx.workspace.id },
+          where: { id: itemId },
           select: { id: true, title: true, projectId: true },
         })
       : null;
-
     const saved: UploadedFile[] = [];
-
     for (const file of files) {
-      const stored = await put(ctx.workspace.id, file);
+      const stored = await put(file, ctx.team.id);
       const attachment = await db.attachment.create({
         data: {
-          workspaceId: ctx.workspace.id,
           uploaderId: ctx.user.id,
           filename: stored.filename,
           mimeType: stored.mimeType,
@@ -67,7 +58,6 @@ export async function uploadFiles(
         },
         select: { id: true },
       });
-
       saved.push({
         id: attachment.id,
         filename: stored.filename,
@@ -77,11 +67,9 @@ export async function uploadFiles(
         sizeBytes: stored.sizeBytes,
       });
     }
-
     const targetProjectId = item?.projectId ?? project?.id ?? null;
     if (targetProjectId) {
       await recordActivity({
-        workspaceId: ctx.workspace.id,
         actorId: ctx.user.id,
         verb: ACTIVITY.fileUploaded,
         targetType: "file",
@@ -95,33 +83,29 @@ export async function uploadFiles(
         },
       });
     }
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
     return saved;
   });
 }
 
 /** Sube una imagen y la deja como portada del proyecto. */
+
 export async function uploadCover(
-  slug: string,
   projectId: string,
   formData: FormData,
 ): Promise<ActionResult<{ url: string }>> {
   return run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const file = formData.get("file");
     if (!(file instanceof File)) throw new Error("Elegí una imagen.");
     if (!file.type.startsWith("image/")) throw new Error("La portada tiene que ser una imagen.");
-
     const project = await db.project.findFirstOrThrow({
-      where: { id: projectId, workspaceId: ctx.workspace.id },
+      where: { id: projectId },
       select: { id: true, name: true },
     });
-
-    const stored = await put(ctx.workspace.id, file);
+    const stored = await put(file, ctx.team.id);
     await db.attachment.create({
       data: {
-        workspaceId: ctx.workspace.id,
         uploaderId: ctx.user.id,
         filename: stored.filename,
         mimeType: stored.mimeType,
@@ -131,14 +115,11 @@ export async function uploadCover(
         projectId: project.id,
       },
     });
-
     await db.project.update({
       where: { id: project.id },
       data: { coverUrl: urlFor(stored.key) },
     });
-
     await recordActivity({
-      workspaceId: ctx.workspace.id,
       actorId: ctx.user.id,
       verb: ACTIVITY.projectUpdated,
       targetType: "project",
@@ -147,27 +128,25 @@ export async function uploadCover(
       projectId: project.id,
       meta: { fields: ["portada"] },
     });
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
     return { url: urlFor(stored.key) };
   });
 }
 
 export async function deleteAttachment(
-  slug: string,
   attachmentId: string,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const attachment = await db.attachment.findFirstOrThrow({
-      where: { id: attachmentId, workspaceId: ctx.workspace.id },
+      where: { id: attachmentId },
       select: { uploaderId: true },
     });
     if (attachment.uploaderId !== ctx.user.id && !ctx.can("workspace.manage")) {
       throw new Error("Solo podés borrar archivos que subiste vos.");
     }
     await db.attachment.delete({ where: { id: attachmentId } });
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }

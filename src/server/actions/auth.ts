@@ -1,8 +1,6 @@
 "use server";
-
 import { z } from "zod";
 import { redirect } from "next/navigation";
-
 import { db } from "@/server/db";
 import {
   createSession,
@@ -12,9 +10,7 @@ import {
   verifyPassword,
 } from "@/server/auth/session";
 import { ok, run, type ActionResult } from "@/server/actions/shared";
-import { slugify } from "@/lib/slug";
 import { accentFromId } from "@/lib/domain";
-
 const emailField = z
   .string()
   .trim()
@@ -28,14 +24,11 @@ const signupSchema = z.object({
   name: z.string().trim().min(2, "Escribí tu nombre."),
   email: emailField,
   password: passwordField,
-  workspaceName: z.string().trim().min(2, "Poné un nombre para el equipo."),
 });
 
 /**
- * El alta redirige desde el servidor. Hacerlo en el cliente después de recibir
- * el slug obliga a un router.replace seguido de un refresh, y ese refresh
- * vuelve a renderizar esta misma ruta —que ahora redirige— dejando la pantalla
- * en blanco a mitad de camino.
+ * El alta redirige desde el servidor: quien firma entra directo a la raíz, que
+ * ahora es la casa del equipo.
  */
 export async function signup(
   _prev: unknown,
@@ -46,7 +39,6 @@ export async function signup(
       name: formData.get("name"),
       email: formData.get("email"),
       password: formData.get("password"),
-      workspaceName: formData.get("workspaceName"),
     });
 
     const existing = await db.user.findUnique({ where: { email: input.email } });
@@ -66,19 +58,18 @@ export async function signup(
       data: { accentColor: accentFromId(user.id) },
     });
 
-    const slug = await uniqueSlug(slugify(input.workspaceName) || "equipo");
-
-    // Quien crea el workspace es su primer admin.
-    await db.workspace.create({
+    // Auto-join: la primera persona de la instancia es admin (arranca el
+    // equipo); el resto entra como comunidad y participa desde el día uno.
+    const memberCount = await db.membership.count();
+    await db.membership.create({
       data: {
-        name: input.workspaceName,
-        slug,
-        members: { create: { userId: user.id, role: "admin" } },
+        userId: user.id,
+        role: memberCount === 0 ? "admin" : "community",
       },
     });
 
     await createSession(user.id);
-    redirect(`/w/${slug}`);
+    redirect("/");
   });
 }
 
@@ -110,18 +101,7 @@ export async function login(
 
     await createSession(user.id);
 
-    const membership = await db.membership.findFirst({
-      where: { userId: user.id },
-      orderBy: { joinedAt: "asc" },
-      select: { workspace: { select: { slug: true } } },
-    });
-
-    const target =
-      typeof next === "string" && next.startsWith("/")
-        ? next
-        : membership
-          ? `/w/${membership.workspace.slug}`
-          : "/nuevo-equipo";
+    const target = typeof next === "string" && next.startsWith("/") ? next : "/";
 
     redirect(target);
   });
@@ -183,13 +163,4 @@ export async function changePassword(formData: FormData): Promise<ActionResult> 
     });
   });
   return result.ok ? ok() : result;
-}
-
-async function uniqueSlug(base: string) {
-  let candidate = base;
-  let suffix = 1;
-  while (await db.workspace.findUnique({ where: { slug: candidate } })) {
-    candidate = `${base}-${++suffix}`;
-  }
-  return candidate;
 }
