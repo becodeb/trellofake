@@ -1,0 +1,65 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Product: Hilo (repo: trellofake) — community + dev collaboration workspace (Trello-like).
+  Stack: Next.js 15 App Router + Server Actions, Prisma + SQLite, Tailwind v4, Radix UI, dnd-kit, Zod.
+  Auth: custom cookie + session table (bcryptjs). Storage: local disk behind src/server/storage.ts.
+  Architecture: one Item for 6 content types; self-referential Project (materialized path);
+    write-time activity fan-out (FeedEntry); progress persisted (not computed); capability auth via can().
+  Domain vocab (states/roles/capabilities) source of truth: src/lib/domain.ts.
+  Server logic: src/server/{auth,domain,actions}; Server Actions return ActionResult, validated with Zod.
+  Conventions: TS strict; path alias @/* -> src/*; conventional commits (no AI attribution).
+  Testing: NONE configured (only `tsc --noEmit` typecheck). See testing: block below.
+
+strict_tdd: false
+
+testing:
+  strict_tdd: false
+  detected: "2026-08-28"
+  runner:
+    command: ""          # no test runner installed
+    framework: none
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  coverage: false
+  quality:
+    linter: "npm run lint"            # next lint (deprecated in Next 15; verify before relying)
+    typecheck: "npm run typecheck"    # tsc --noEmit
+    formatter: ""                     # none configured
+
+workflow:
+  delivery_strategy: single-pr
+  review_budget_lines: 800
+  session_execution_mode: auto
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Note impact on write-time activity fan-out (FeedEntry) when touching domain mutations
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Reference src/lib/domain.ts for state/role/capability vocabulary
+  design:
+    - Document architecture decisions with rationale; cite README "Decisiones de arquitectura"
+    - Note effects on progress roll-up and feed fan-out before changing domain modules
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Strongly prefer adding a test runner (vitest) for pure domain modules (progress/activity/search)
+  apply:
+    guidelines:
+      - Follow existing patterns: Server Actions returning ActionResult, Zod validation
+      - Respect @/* alias and server/client boundary (cross-boundary pure helpers live in src/lib/shared.ts)
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: "npm run build"
+    typecheck_command: "npm run typecheck"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

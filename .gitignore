@@ -22,3 +22,6 @@ storage
 # sistema
 .DS_Store
 Thumbs.db
+
+# caché local de SDD / índice de skills (no se commitea)
+.atl/
