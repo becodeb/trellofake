@@ -10,11 +10,9 @@ import { Button } from "@/components/ui/button";
 
 /** Retomar un proyecto archivado: vuelve a activo sin perder nada. */
 export function RestoreProjectButton({
-  slug,
   projectId,
   name,
 }: {
-  slug: string;
   projectId: string;
   name: string;
 }) {
@@ -28,7 +26,7 @@ export function RestoreProjectButton({
       loading={pending}
       onClick={() =>
         startTransition(async () => {
-          const result = await restoreProject(slug, projectId);
+          const result = await restoreProject(projectId);
           if (!result.ok) {
             toast.error(result.error);
             return;

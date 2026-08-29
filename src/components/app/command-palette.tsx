@@ -34,12 +34,10 @@ import { Kbd } from "@/components/ui/overlays";
 export function CommandPalette({
   open,
   onOpenChange,
-  slug,
   canManage,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  slug: string;
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -66,7 +64,7 @@ export function CommandPalette({
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const results = await quickSearch(slug, trimmed);
+        const results = await quickSearch(trimmed);
         if (!cancelled) setHits(results);
       } finally {
         if (!cancelled) setLoading(false);
@@ -77,7 +75,7 @@ export function CommandPalette({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, slug]);
+  }, [query]);
 
   const go = (href: string) => {
     onOpenChange(false);
@@ -85,12 +83,12 @@ export function CommandPalette({
   };
 
   const places = [
-    { href: `/w/${slug}`, label: "Hoy", icon: Compass },
-    { href: `/w/${slug}/novedades`, label: "Novedades", icon: Inbox },
-    { href: `/w/${slug}/mi-trabajo`, label: "Mi trabajo", icon: ListChecks },
-    { href: `/w/${slug}/proyectos`, label: "Proyectos", icon: LayoutGrid },
-    { href: `/w/${slug}/archivo`, label: "Archivo", icon: Archive },
-    ...(canManage ? [{ href: `/w/${slug}/ajustes`, label: "Ajustes", icon: Settings }] : []),
+    { href: "/", label: "Hoy", icon: Compass },
+    { href: "/novedades", label: "Novedades", icon: Inbox },
+    { href: "/mi-trabajo", label: "Mi trabajo", icon: ListChecks },
+    { href: "/proyectos", label: "Proyectos", icon: LayoutGrid },
+    { href: "/archivo", label: "Archivo", icon: Archive },
+    ...(canManage ? [{ href: "/ajustes", label: "Ajustes", icon: Settings }] : []),
   ];
 
   const searching = query.trim().length >= 2;
@@ -180,7 +178,7 @@ export function CommandPalette({
               ))}
 
               {searching && hits.length > 0 && (
-                <Item onSelect={() => go(`/w/${slug}/buscar?q=${encodeURIComponent(query)}`)}>
+                <Item onSelect={() => go(`/buscar?q=${encodeURIComponent(query)}`)}>
                   <FileText className="size-4 shrink-0 text-ink-3" strokeWidth={1.9} />
                   <span className="flex-1">Ver todos los resultados de “{query}”</span>
                 </Item>

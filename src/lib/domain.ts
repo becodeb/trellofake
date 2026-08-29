@@ -64,22 +64,6 @@ export function isTeamRole(role: string): boolean {
   return role === "admin" || role === "developer" || role === "member";
 }
 
-export const PROJECT_VISIBILITIES = ["community", "team"] as const;
-export type ProjectVisibility = (typeof PROJECT_VISIBILITIES)[number];
-export const PROJECT_VISIBILITY_META: Record<
-  ProjectVisibility,
-  { label: string; description: string }
-> = {
-  community: {
-    label: "Visible para la comunidad",
-    description: "Todos pueden seguir avances, proponer y comentar.",
-  },
-  team: {
-    label: "Solo equipo de desarrollo",
-    description: "Tareas, decisiones y recursos quedan dentro del equipo.",
-  },
-};
-
 export const PROPOSAL_STATUSES = [
   "proposed",
   "reviewing",

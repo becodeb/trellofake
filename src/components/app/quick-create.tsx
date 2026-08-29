@@ -31,7 +31,6 @@ import {
 export function QuickCreate({
   open,
   onOpenChange,
-  slug,
   projects,
   members,
   defaultProjectId,
@@ -41,7 +40,6 @@ export function QuickCreate({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  slug: string;
   projects: ProjectOption[];
   members: PersonLike[];
   defaultProjectId?: string | null;
@@ -81,7 +79,7 @@ export function QuickCreate({
   const submit = async () => {
     if (!title.trim() || !projectId || pending) return;
     setPending(true);
-    const result = await createItem(slug, {
+    const result = await createItem({
       projectId,
       type,
       title: title.trim(),

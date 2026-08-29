@@ -26,12 +26,10 @@ export type ResourceLinkData = {
  * guardar un link.
  */
 export function ResourceLinks({
-  slug,
   projectId,
   links,
   canWrite,
 }: {
-  slug: string;
   projectId: string;
   links: ResourceLinkData[];
   canWrite: boolean;
@@ -45,7 +43,7 @@ export function ResourceLinks({
     if (!url || pending) return;
 
     setPending(true);
-    const result = await addLink(slug, projectId, { url });
+    const result = await addLink(projectId, { url });
     setPending(false);
 
     if (!result.ok) {
@@ -85,7 +83,7 @@ export function ResourceLinks({
             <RowAction
               aria-label="Quitar recurso"
               onClick={async () => {
-                const result = await removeLink(slug, projectId, link.id);
+                const result = await removeLink(projectId, link.id);
                 if (!result.ok) toast.error(result.error);
                 else router.refresh();
               }}

@@ -30,7 +30,6 @@ const REASON_RANK: Record<FeedReason, number> = {
 };
 
 export type RecordActivityInput = {
-  workspaceId: string;
   actorId: string;
   verb: ActivityVerb;
   targetType:
@@ -54,7 +53,6 @@ export type RecordActivityInput = {
 export async function recordActivity(input: RecordActivityInput) {
   const activity = await db.activity.create({
     data: {
-      workspaceId: input.workspaceId,
       actorId: input.actorId,
       verb: input.verb,
       projectId: input.projectId ?? null,
@@ -69,7 +67,6 @@ export async function recordActivity(input: RecordActivityInput) {
 
   await fanOut({
     activityId: activity.id,
-    workspaceId: input.workspaceId,
     actorId: input.actorId,
     projectId: input.projectId ?? null,
     itemId: input.itemId ?? null,
@@ -85,7 +82,6 @@ export async function recordActivity(input: RecordActivityInput) {
  */
 async function fanOut(args: {
   activityId: string;
-  workspaceId: string;
   actorId: string;
   projectId: string | null;
   itemId: string | null;
@@ -119,10 +115,9 @@ async function fanOut(args: {
       for (const c of item.comments) add(c.authorId, "reply");
       add(item.createdById, "author");
 
-      // Una tarea del equipo le llega a todo el workspace como asignada.
+      // Una tarea del equipo le llega a todo el equipo como asignada.
       if (item.assigneeScope === "team") {
         const members = await db.membership.findMany({
-          where: { workspaceId: args.workspaceId },
           select: { userId: true },
         });
         for (const m of members) add(m.userId, "assigned");
@@ -144,7 +139,6 @@ async function fanOut(args: {
     data: Array.from(candidates, ([userId, reason]) => ({
       userId,
       activityId: args.activityId,
-      workspaceId: args.workspaceId,
       reason,
       direct: DIRECT_REASONS.includes(reason),
     })),
@@ -153,7 +147,7 @@ async function fanOut(args: {
 
 /**
  * Menciones: `@Nombre` dentro de un comentario o descripción.
- * Se resuelven contra los miembros del workspace, no contra texto libre, para
+ * Se resuelven contra los miembros del equipo, no contra texto libre, para
  * que una mención siempre apunte a una persona real.
  */
 export function parseMentions(
@@ -175,7 +169,7 @@ export function parseMentions(
   return Array.from(found);
 }
 
-/** Marca el workspace como visto: mueve la línea de "novedades". */
+/** Marca el equipo como visto: mueve la línea de "novedades". */
 export async function touchLastSeen(membershipId: string) {
   await db.membership.update({
     where: { id: membershipId },

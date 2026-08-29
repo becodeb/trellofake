@@ -7,6 +7,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL:-file:/app/data/prod.db}
       - STORAGE_DIR=${STORAGE_DIR:-/app/storage}
+      - TEAM_SLUG=${TEAM_SLUG:-hilo}
     volumes:
       - hilo-data:/app/data
       - hilo-storage:/app/storage

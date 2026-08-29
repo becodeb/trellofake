@@ -38,8 +38,6 @@ function excerpt(text: string | null, query: string, radius = 70): string | null
 }
 
 export async function search(
-  workspaceId: string,
-  slug: string,
   rawQuery: string,
   options: { kinds?: SearchKind[]; limit?: number } = {},
 ): Promise<SearchHit[]> {
@@ -52,7 +50,6 @@ export async function search(
     wants("project")
       ? db.project.findMany({
           where: {
-            workspaceId,
             OR: [{ name: { contains: query } }, { description: { contains: query } }],
           },
           select: {
@@ -70,7 +67,6 @@ export async function search(
 
     db.item.findMany({
       where: {
-        workspaceId,
         OR: [{ title: { contains: query } }, { body: { contains: query } }],
       },
       select: {
@@ -89,7 +85,7 @@ export async function search(
 
     wants("comment")
       ? db.comment.findMany({
-          where: { workspaceId, body: { contains: query } },
+          where: { body: { contains: query } },
           select: {
             id: true,
             body: true,
@@ -108,7 +104,6 @@ export async function search(
     wants("person")
       ? db.membership.findMany({
           where: {
-            workspaceId,
             user: { OR: [{ name: { contains: query } }, { email: { contains: query } }] },
           },
           select: { role: true, user: { select: { ...personSelect, email: true } } },
@@ -118,7 +113,7 @@ export async function search(
 
     wants("file")
       ? db.attachment.findMany({
-          where: { workspaceId, filename: { contains: query } },
+          where: { filename: { contains: query } },
           select: {
             id: true,
             filename: true,
@@ -144,7 +139,7 @@ export async function search(
       kind: "project",
       title: p.name,
       excerpt: excerpt(p.description, query),
-      href: `/w/${slug}/p/${p.id}`,
+      href: `/p/${p.id}`,
       projectName: null,
       accent: p.accent,
       status: p.archivedAt ? "archived" : p.status,
@@ -160,7 +155,7 @@ export async function search(
       kind: item.type as SearchKind,
       title: item.title,
       excerpt: excerpt(item.body, query),
-      href: `/w/${slug}/p/${item.projectId}?item=${item.id}`,
+      href: `/p/${item.projectId}?item=${item.id}`,
       projectName: item.project.name,
       accent: item.project.accent,
       status: item.status,
@@ -177,8 +172,8 @@ export async function search(
       title: comment.item ? `Comentario en “${comment.item.title}”` : "Comentario en el proyecto",
       excerpt: excerpt(comment.body, query),
       href: comment.item
-        ? `/w/${slug}/p/${projectId}?item=${comment.item.id}`
-        : `/w/${slug}/p/${projectId}`,
+        ? `/p/${projectId}?item=${comment.item.id}`
+        : `/p/${projectId}`,
       projectName: comment.project?.name ?? null,
       accent: comment.project?.accent ?? "stone",
       status: null,
@@ -194,7 +189,7 @@ export async function search(
       kind: "person",
       title: member.user.name,
       excerpt: member.user.email,
-      href: `/w/${slug}/gente/${member.user.id}`,
+      href: `/gente/${member.user.id}`,
       projectName: null,
       accent: member.user.accentColor,
       status: member.role,
@@ -212,8 +207,8 @@ export async function search(
       title: file.filename,
       excerpt: null,
       href: file.itemId
-        ? `/w/${slug}/p/${projectId}?item=${file.itemId}`
-        : `/w/${slug}/p/${projectId}/files`,
+        ? `/p/${projectId}?item=${file.itemId}`
+        : `/p/${projectId}/archivos`,
       projectName: file.project?.name ?? null,
       accent: file.project?.accent ?? "stone",
       status: file.kind,

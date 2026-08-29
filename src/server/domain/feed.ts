@@ -11,7 +11,7 @@ export { groupByDay, collapseNoise, type ActivityEvent } from "@/lib/shared";
  *
  * Hay tres formas de mirar lo mismo:
  *   - `personalFeed`  qué me toca a mí (lee FeedEntry, ya filtrado en escritura)
- *   - `workspaceFeed` qué pasó en el equipo (lee Activity directo)
+ *   - `teamFeed`      qué pasó en el equipo (lee Activity directo)
  *   - `projectHistory` la memoria de un proyecto y sus subproyectos
  */
 
@@ -29,14 +29,12 @@ const activitySelect = {
 } as const;
 
 export async function personalFeed(
-  workspaceId: string,
   userId: string,
   options: { take?: number; unreadOnly?: boolean; before?: Date } = {},
 ): Promise<ActivityEvent[]> {
   const entries = await db.feedEntry.findMany({
     where: {
       userId,
-      workspaceId,
       ...(options.unreadOnly ? { readAt: null } : {}),
       ...(options.before ? { createdAt: { lt: options.before } } : {}),
     },
@@ -60,14 +58,11 @@ export async function personalFeed(
   }));
 }
 
-export async function workspaceFeed(
-  workspaceId: string,
-  options: { take?: number; before?: Date; projectIds?: string[] } = {},
+export async function teamFeed(
+  options: { take?: number; before?: Date } = {},
 ): Promise<ActivityEvent[]> {
   return db.activity.findMany({
     where: {
-      workspaceId,
-      ...(options.projectIds ? { projectId: { in: options.projectIds } } : {}),
       ...(options.before ? { createdAt: { lt: options.before } } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -112,33 +107,29 @@ export type FeedCounts = {
 };
 
 export async function feedCounts(
-  workspaceId: string,
   userId: string,
   lastSeenAt: Date,
 ): Promise<FeedCounts> {
   const [unread, direct, sinceLastVisit] = await Promise.all([
-    db.feedEntry.count({ where: { userId, workspaceId, readAt: null } }),
-    db.feedEntry.count({ where: { userId, workspaceId, readAt: null, direct: true } }),
+    db.feedEntry.count({ where: { userId, readAt: null } }),
+    db.feedEntry.count({ where: { userId, readAt: null, direct: true } }),
     db.activity.count({
-      where: { workspaceId, createdAt: { gt: lastSeenAt }, actorId: { not: userId } },
+      where: { createdAt: { gt: lastSeenAt }, actorId: { not: userId } },
     }),
   ]);
   return { unread, direct, sinceLastVisit };
 }
 
 export async function markFeedRead(
-  workspaceId: string,
   userId: string,
   entryId?: string,
 ) {
   await db.feedEntry.updateMany({
     where: {
       userId,
-      workspaceId,
       readAt: null,
       ...(entryId ? { id: entryId } : {}),
     },
     data: { readAt: new Date() },
   });
 }
-

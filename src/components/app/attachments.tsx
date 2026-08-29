@@ -35,14 +35,12 @@ export function fileUrl(storageKey: string) {
  * entera lo acepta; el botón está para quien prefiere el diálogo del sistema.
  */
 export function FileDrop({
-  slug,
   projectId,
   itemId,
   label = "Arrastrá archivos o hacé click",
   compact = false,
   className,
 }: {
-  slug: string;
   projectId?: string;
   itemId?: string;
   label?: string;
@@ -63,7 +61,7 @@ export function FileDrop({
     for (const file of Array.from(files)) data.append("files", file);
 
     setPending(true);
-    const result = await uploadFiles(slug, data);
+    const result = await uploadFiles(data);
     setPending(false);
 
     if (!result.ok) {
@@ -126,12 +124,10 @@ export function FileDrop({
 
 /** Imágenes como miniaturas, el resto como filas. */
 export function AttachmentGrid({
-  slug,
   attachments,
   viewerId,
   className,
 }: {
-  slug: string;
   attachments: AttachmentData[];
   viewerId?: string;
   className?: string;
@@ -166,7 +162,6 @@ export function AttachmentGrid({
               </figcaption>
               {viewerId && image.uploader?.id === viewerId && (
                 <DeleteButton
-                  slug={slug}
                   id={image.id}
                   className="absolute right-1 top-1 bg-surface/90 backdrop-blur-sm"
                 />
@@ -205,7 +200,7 @@ export function AttachmentGrid({
               </a>
 
               {viewerId && file.uploader?.id === viewerId && (
-                <DeleteButton slug={slug} id={file.id} />
+                <DeleteButton id={file.id} />
               )}
             </li>
           ))}
@@ -216,11 +211,9 @@ export function AttachmentGrid({
 }
 
 function DeleteButton({
-  slug,
   id,
   className,
 }: {
-  slug: string;
   id: string;
   className?: string;
 }) {
@@ -235,7 +228,7 @@ function DeleteButton({
         aria-label="Borrar archivo"
         onClick={() =>
           startTransition(async () => {
-            const result = await deleteAttachment(slug, id);
+            const result = await deleteAttachment(id);
             if (!result.ok) toast.error(result.error);
             else router.refresh();
           })

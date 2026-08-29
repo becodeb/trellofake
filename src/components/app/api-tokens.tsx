@@ -36,7 +36,7 @@ export type ApiTokenRow = {
  * El token crudo se muestra una sola vez, en el momento de crearlo, junto con
  * la URL del endpoint. Después solo queda el hash (enmascarado) en la lista.
  */
-export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[] }) {
+export function ApiTokens({ tokens }: { tokens: ApiTokenRow[] }) {
   const router = useRouter();
   const [expiry, setExpiry] = React.useState<string>(EXPIRY_OPTIONS[1].label);
   const [pending, setPending] = React.useState(false);
@@ -53,7 +53,7 @@ export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[
     const expiresAt = new Date(Date.now() + option.days * 86_400_000).toISOString();
 
     setPending(true);
-    const result = await createApiTokenAction(slug, { expiresAt });
+    const result = await createApiTokenAction({ expiresAt });
     setPending(false);
 
     if (!result.ok) {
@@ -67,7 +67,7 @@ export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[
   };
 
   const revoke = async (tokenId: string) => {
-    const result = await revokeApiToken(slug, tokenId);
+    const result = await revokeApiToken(tokenId);
     if (!result.ok) {
       toast.error(result.error);
       return;
@@ -83,7 +83,7 @@ export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[
       <div className="space-y-3.5 rounded-[var(--r-lg)] border border-line bg-surface p-4">
         <Field
           label="Crear token de acceso"
-          hint="Un token le da a un cliente IA acceso de solo lectura a este workspace. Vence solo, y podés revocarlo cuando quieras."
+          hint="Un token le da a un cliente IA acceso de solo lectura a este equipo. Vence solo, y podés revocarlo cuando quieras."
         >
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">

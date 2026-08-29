@@ -31,7 +31,7 @@ export type ProposalData = {
   status: string;
   createdAt: Date;
   author: PersonLike;
-  targetProject: { id: string; name: string; visibility: string } | null;
+  targetProject: { id: string; name: string } | null;
   promotedProject: { id: string; name: string } | null;
   replies: Array<{ id: string; body: string; createdAt: Date; author: PersonLike }>;
 };
@@ -39,27 +39,34 @@ export type ProposalData = {
 type ProjectOption = { id: string; name: string };
 
 export function ProposalsBoard({
-  slug,
   proposals,
   projects,
   canManage,
   viewer,
 }: {
-  slug: string;
   proposals: ProposalData[];
   projects: ProjectOption[];
   canManage: boolean;
-  viewer: PersonLike;
+  viewer: PersonLike | null;
 }) {
   const [creating, setCreating] = React.useState(false);
 
   return (
     <>
       <div className="mb-5 flex justify-end">
-        <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
-          <Plus className="size-3.5" strokeWidth={2.4} />
-          Proponer una idea
-        </Button>
+        {viewer ? (
+          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+            <Plus className="size-3.5" strokeWidth={2.4} />
+            Proponer una idea
+          </Button>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-ink-3">
+            <Link href="/login" className="font-medium text-accent-ink hover:underline">
+              Ingresá
+            </Link>
+            para proponer una idea.
+          </p>
+        )}
       </div>
 
       {proposals.length === 0 ? (
@@ -76,7 +83,6 @@ export function ProposalsBoard({
           {proposals.map((proposal) => (
             <ProposalCard
               key={proposal.id}
-              slug={slug}
               proposal={proposal}
               projects={projects}
               canManage={canManage}
@@ -87,7 +93,6 @@ export function ProposalsBoard({
       )}
 
       <NewProposalDialog
-        slug={slug}
         projects={projects}
         open={creating}
         onOpenChange={setCreating}
@@ -97,17 +102,15 @@ export function ProposalsBoard({
 }
 
 function ProposalCard({
-  slug,
   proposal,
   projects,
   canManage,
   viewer,
 }: {
-  slug: string;
   proposal: ProposalData;
   projects: ProjectOption[];
   canManage: boolean;
-  viewer: PersonLike;
+  viewer: PersonLike | null;
 }) {
   const router = useRouter();
   const [reply, setReply] = React.useState("");
@@ -116,7 +119,7 @@ function ProposalCard({
 
   const triage = async (nextStatus: ProposalStatus, targetProjectId?: string | null) => {
     setPending(true);
-    const result = await triageProposal(slug, proposal.id, {
+    const result = await triageProposal(proposal.id, {
       status: nextStatus,
       ...(targetProjectId !== undefined ? { targetProjectId } : {}),
     });
@@ -169,7 +172,7 @@ function ProposalCard({
 
           {proposal.targetProject && (
             <Link
-              href={`/w/${slug}/p/${proposal.targetProject.id}`}
+              href={`/p/${proposal.targetProject.id}`}
               className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-accent-ink hover:underline"
             >
               {proposal.targetProject.name}
@@ -200,12 +203,12 @@ function ProposalCard({
               loading={pending}
               onClick={async () => {
                 setPending(true);
-                const result = await promoteProposal(slug, proposal.id);
+                const result = await promoteProposal(proposal.id);
                 setPending(false);
                 if (!result.ok) toast.error(result.error);
                 else {
                   toast.success("La idea ya es un proyecto");
-                  router.push(`/w/${slug}/p/${result.data.projectId}`);
+                  router.push(`/p/${result.data.projectId}`);
                   router.refresh();
                 }
               }}
@@ -236,32 +239,41 @@ function ProposalCard({
           </ul>
         )}
 
-        <div className="flex items-start gap-2.5">
-          <Avatar person={viewer} size="xs" className="mt-1" />
-          <div className="min-w-0 flex-1">
-            <AutoTextarea
-              value={reply}
-              onChange={(event) => setReply(event.target.value)}
-              minRows={1}
-              placeholder="Sumá contexto, una duda o una sugerencia…"
-              className="min-h-8 bg-surface"
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && reply.trim()) {
-                  event.preventDefault();
-                  void sendReply();
-                }
-              }}
-            />
-            {reply.trim() && (
-              <div className="mt-1.5 flex justify-end">
-                <Button size="xs" variant="primary" loading={pending} onClick={() => void sendReply()}>
-                  <CornerDownLeft className="size-3" />
-                  Responder
-                </Button>
-              </div>
-            )}
+        {viewer ? (
+          <div className="flex items-start gap-2.5">
+            <Avatar person={viewer} size="xs" className="mt-1" />
+            <div className="min-w-0 flex-1">
+              <AutoTextarea
+                value={reply}
+                onChange={(event) => setReply(event.target.value)}
+                minRows={1}
+                placeholder="Sumá contexto, una duda o una sugerencia…"
+                className="min-h-8 bg-surface"
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && reply.trim()) {
+                    event.preventDefault();
+                    void sendReply();
+                  }
+                }}
+              />
+              {reply.trim() && (
+                <div className="mt-1.5 flex justify-end">
+                  <Button size="xs" variant="primary" loading={pending} onClick={() => void sendReply()}>
+                    <CornerDownLeft className="size-3" />
+                    Responder
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-ink-3">
+            <Link href="/login" className="font-medium text-accent-ink hover:underline">
+              Ingresá
+            </Link>
+            para responder.
+          </p>
+        )}
       </div>
     </article>
   );
@@ -269,7 +281,7 @@ function ProposalCard({
   async function sendReply() {
     if (!reply.trim() || pending) return;
     setPending(true);
-    const result = await replyToProposal(slug, proposal.id, reply);
+    const result = await replyToProposal(proposal.id, reply);
     setPending(false);
     if (!result.ok) toast.error(result.error);
     else {
@@ -280,12 +292,10 @@ function ProposalCard({
 }
 
 function NewProposalDialog({
-  slug,
   projects,
   open,
   onOpenChange,
 }: {
-  slug: string;
   projects: ProjectOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -307,7 +317,7 @@ function NewProposalDialog({
 
   const submit = async () => {
     setPending(true);
-    const result = await createProposal(slug, {
+    const result = await createProposal({
       title,
       body,
       category,

@@ -1,13 +1,11 @@
 "use server";
-
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-
 import { db } from "@/server/db";
-import { requireWorkspaceAction } from "@/server/auth/context";
+import { requireTeamAction } from "@/server/auth/context";
 import { parseMentions, recordActivity } from "@/server/domain/activity";
 import { refreshItem, refreshProject } from "@/server/domain/progress";
-import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
+import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import {
   ACTIVITY,
   ASSIGNEE_SCOPES,
@@ -19,14 +17,12 @@ import {
   normalizeWeights,
   statusMeta,
 } from "@/lib/domain";
-
 const optionalDate = z
   .string()
   .trim()
   .optional()
   .transform((value) => (value ? new Date(value) : null))
   .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-
 const createSchema = z.object({
   projectId: z.string().min(1, "Elegí un proyecto."),
   type: z.enum(ITEM_TYPES),
@@ -44,37 +40,31 @@ const createSchema = z.object({
  * Crear contenido es la acción más frecuente de la app: una sola llamada
  * resuelve tarea, idea, nota, problema, decisión o actualización.
  */
+
 export async function createItem(
-  slug: string,
   raw: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   return run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const input = createSchema.parse(raw);
-
     const project = await db.project.findFirstOrThrow({
-      where: { id: input.projectId, workspaceId: ctx.workspace.id },
+      where: { id: input.projectId },
       select: { id: true, name: true },
     });
-
     const meta = ITEM_TYPE_META[input.type];
     const status =
       input.status && isValidStatus(input.type, input.status)
         ? input.status
         : meta.defaultStatus;
-
     const last = await db.item.findFirst({
       where: { projectId: project.id, type: input.type, parentId: input.parentId ?? null },
       orderBy: { position: "desc" },
       select: { position: true },
     });
-
     const assignees = meta.schedulable ? input.assigneeIds : [];
     const weights = evenWeights(assignees.length);
-
     const item = await db.item.create({
       data: {
-        workspaceId: ctx.workspace.id,
         projectId: project.id,
         parentId: input.parentId || null,
         type: input.type,
@@ -97,17 +87,14 @@ export async function createItem(
       },
       select: { id: true, title: true, type: true, parentId: true },
     });
-
-    const members = await workspaceMemberNames(ctx.workspace.id);
+    const members = await workspaceMemberNames();
     const mentioned = parseMentions(input.body ?? "", members);
     if (mentioned.length > 0) {
       await db.mention.createMany({
         data: mentioned.map((userId) => ({ userId, itemId: item.id })),
       });
     }
-
     await recordActivity({
-      workspaceId: ctx.workspace.id,
       actorId: ctx.user.id,
       verb: item.parentId ? ACTIVITY.subtaskAdded : ACTIVITY.itemCreated,
       targetType: "item",
@@ -118,13 +105,11 @@ export async function createItem(
       meta: { type: item.type, project: project.name },
       audience: mentioned.map((userId) => ({ userId, reason: "mentioned" as const })),
     });
-
     await refreshItem(item.id);
-    revalidateWorkspace(slug);
+    revalidateTeam();
     return { id: item.id };
   });
 }
-
 const updateSchema = z.object({
   title: z.string().trim().min(1).optional(),
   body: z.string().trim().max(20000).nullable().optional(),
@@ -133,19 +118,16 @@ const updateSchema = z.object({
 });
 
 export async function updateItem(
-  slug: string,
   itemId: string,
   raw: unknown,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const input = updateSchema.parse(raw);
-
     const before = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { title: true, priority: true, dueDate: true, projectId: true, type: true },
     });
-
     const item = await db.item.update({
       where: { id: itemId },
       data: {
@@ -156,7 +138,6 @@ export async function updateItem(
       },
       select: { id: true, title: true, projectId: true },
     });
-
     // Cada cambio con significado propio deja su propio rastro.
     if (input.priority && input.priority !== before.priority) {
       await logItem(ctx, item, ACTIVITY.itemPriorityChanged, {
@@ -173,32 +154,26 @@ export async function updateItem(
         type: before.type,
       });
     }
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
 
 export async function setItemStatus(
-  slug: string,
   itemId: string,
   status: string,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
-
+    const ctx = await requireTeamAction("content.write");
     const before = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { type: true, status: true, title: true, projectId: true },
     });
-
     if (!isValidStatus(before.type, status)) throw new Error("Ese estado no existe acá.");
     if (before.status === status) return;
-
     const next = statusMeta(before.type, status);
     const previous = statusMeta(before.type, before.status);
     const completing = next.terminal && next.weight === 100;
-
     const item = await db.item.update({
       where: { id: itemId },
       data: {
@@ -207,13 +182,11 @@ export async function setItemStatus(
       },
       select: { id: true, title: true, projectId: true },
     });
-
     const verb = completing
       ? ACTIVITY.itemCompleted
       : previous.terminal
         ? ACTIVITY.itemReopened
         : ACTIVITY.itemStatusChanged;
-
     await logItem(ctx, item, verb, {
       from: before.status,
       to: status,
@@ -221,47 +194,40 @@ export async function setItemStatus(
       fromLabel: previous.label,
       toLabel: next.label,
     });
-
     await refreshItem(itemId);
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
 
 export async function setItemProgress(
-  slug: string,
   itemId: string,
   progress: number,
   mode: "auto" | "manual",
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const before = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { progress: true, title: true, projectId: true },
     });
-
     const value = Math.max(0, Math.min(100, Math.round(progress)));
     const item = await db.item.update({
       where: { id: itemId },
       data: { progressMode: mode, ...(mode === "manual" ? { progress: value } : {}) },
       select: { id: true, title: true, projectId: true },
     });
-
     await refreshItem(itemId);
-
     if (mode === "manual" && value !== before.progress) {
       await logItem(ctx, item, ACTIVITY.itemProgressChanged, {
         from: before.progress,
         to: value,
       });
     }
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
-
 const assigneeSchema = z.object({
   scope: z.enum(ASSIGNEE_SCOPES).default("individual"),
   assignees: z
@@ -273,17 +239,16 @@ const assigneeSchema = z.object({
  * Asignación colaborativa. Si no se pasan pesos, se reparte en partes iguales;
  * si se pasan, se normalizan para que sumen exactamente 100.
  */
+
 export async function setAssignees(
-  slug: string,
   itemId: string,
   raw: unknown,
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const input = assigneeSchema.parse(raw);
-
     const item = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: {
         id: true,
         title: true,
@@ -292,24 +257,19 @@ export async function setAssignees(
         assignments: { select: { userId: true, weight: true } },
       },
     });
-
     const members = await db.membership.findMany({
       where: {
-        workspaceId: ctx.workspace.id,
         userId: { in: input.assignees.map((a) => a.userId) },
       },
       select: { userId: true, user: { select: { name: true } } },
     });
     const valid = input.assignees.filter((a) => members.some((m) => m.userId === a.userId));
-
     const explicit = valid.some((a) => a.weight !== undefined);
     const weights = explicit
       ? normalizeWeights(valid.map((a) => a.weight ?? 0))
       : evenWeights(valid.length);
-
     const previous = new Set(item.assignments.map((a) => a.userId));
     const nextIds = new Set(valid.map((a) => a.userId));
-
     await db.$transaction([
       db.itemAssignment.deleteMany({ where: { itemId } }),
       db.itemAssignment.createMany({
@@ -322,12 +282,10 @@ export async function setAssignees(
       }),
       db.item.update({ where: { id: itemId }, data: { assigneeScope: input.scope } }),
     ]);
-
     const added = valid.filter((a) => !previous.has(a.userId));
     const removed = [...previous].filter((id) => !nextIds.has(id));
     const nameOf = (userId: string) =>
       members.find((m) => m.userId === userId)?.user.name ?? "alguien";
-
     if (input.scope === "team" && item.assigneeScope !== "team") {
       await logItem(ctx, item, ACTIVITY.itemAssigned, { team: true });
     } else if (added.length > 0) {
@@ -341,28 +299,25 @@ export async function setAssignees(
         split: valid.map((a, i) => `${nameOf(a.userId)} ${weights[i]}%`),
       });
     }
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
 
 /** Convierte una idea en tarea conservando el rastro de dónde salió. */
+
 export async function convertToTask(
-  slug: string,
   itemId: string,
 ): Promise<ActionResult<{ id: string }>> {
   return run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const source = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { id: true, title: true, body: true, priority: true, projectId: true, type: true },
     });
     if (source.type !== "idea") throw new Error("Solo se convierten ideas en tareas.");
-
     const task = await db.item.create({
       data: {
-        workspaceId: ctx.workspace.id,
         projectId: source.projectId,
         type: "task",
         title: source.title,
@@ -374,52 +329,45 @@ export async function convertToTask(
       },
       select: { id: true, title: true, projectId: true },
     });
-
     await db.item.update({ where: { id: source.id }, data: { status: "converted" } });
-
     await logItem(ctx, task, ACTIVITY.itemConverted, { from: "idea" });
     await refreshProject(source.projectId);
-    revalidateWorkspace(slug);
+    revalidateTeam();
     return { id: task.id };
   });
 }
 
 /** Reordena y, si cambia de columna en el tablero, actualiza el estado. */
+
 export async function moveItem(
-  slug: string,
   itemId: string,
   target: { status?: string; position: number },
 ): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const item = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { type: true, status: true },
     });
-
     await db.item.update({ where: { id: itemId }, data: { position: target.position } });
-
     if (target.status && target.status !== item.status) {
-      await setItemStatus(slug, itemId, target.status);
+      await setItemStatus(itemId, target.status);
       return;
     }
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
 
-export async function deleteItem(slug: string, itemId: string): Promise<ActionResult> {
+export async function deleteItem(itemId: string): Promise<ActionResult> {
   const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "content.write");
+    const ctx = await requireTeamAction("content.write");
     const item = await db.item.findFirstOrThrow({
-      where: { id: itemId, workspaceId: ctx.workspace.id },
+      where: { id: itemId },
       select: { title: true, projectId: true, parentId: true, type: true },
     });
-
     await db.item.delete({ where: { id: itemId } });
-
     await recordActivity({
-      workspaceId: ctx.workspace.id,
       actorId: ctx.user.id,
       verb: ACTIVITY.itemDeleted,
       targetType: "item",
@@ -428,17 +376,15 @@ export async function deleteItem(slug: string, itemId: string): Promise<ActionRe
       projectId: item.projectId,
       meta: { type: item.type },
     });
-
     if (item.parentId) await refreshItem(item.parentId);
     else await refreshProject(item.projectId);
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }
 
 // ---------------------------------------------------------------- helpers
-
-type Ctx = Awaited<ReturnType<typeof requireWorkspaceAction>>;
+type Ctx = Awaited<ReturnType<typeof requireTeamAction>>;
 
 async function logItem(
   ctx: Ctx,
@@ -447,7 +393,6 @@ async function logItem(
   meta: Record<string, unknown>,
 ) {
   await recordActivity({
-    workspaceId: ctx.workspace.id,
     actorId: ctx.user.id,
     verb: verb as never,
     targetType: "item",
@@ -459,22 +404,22 @@ async function logItem(
   });
 }
 
-async function workspaceMemberNames(workspaceId: string) {
+async function workspaceMemberNames() {
   const members = await db.membership.findMany({
-    where: { workspaceId },
     select: { userId: true, user: { select: { name: true } } },
   });
   return members.map((m) => ({ userId: m.userId, name: m.user.name }));
 }
 
 /** Recalcula desde cero un proyecto y sus items. Útil tras cambios masivos. */
-export async function recomputeProject(slug: string, projectId: string) {
-  const ctx = await requireWorkspaceAction(slug);
+
+export async function recomputeProject(projectId: string) {
+  const ctx = await requireTeamAction();
   const roots = await db.item.findMany({
-    where: { projectId, workspaceId: ctx.workspace.id, parentId: null },
+    where: { projectId,  parentId: null },
     select: { id: true },
   });
   for (const root of roots) await refreshItem(root.id);
   await refreshProject(projectId);
-  revalidatePath(`/w/${slug}/p/${projectId}`, "layout");
+  revalidatePath(`/p/${projectId}`, "layout");
 }

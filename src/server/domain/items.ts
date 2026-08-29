@@ -53,8 +53,8 @@ export type ItemFilter = {
   orderBy?: "position" | "recent" | "due" | "priority";
 };
 
-export function itemWhere(workspaceId: string, filter: ItemFilter): Prisma.ItemWhereInput {
-  const where: Prisma.ItemWhereInput = { workspaceId };
+export function itemWhere(filter: ItemFilter): Prisma.ItemWhereInput {
+  const where: Prisma.ItemWhereInput = {};
 
   if (filter.projectIds) where.projectId = { in: filter.projectIds };
   if (filter.types) where.type = { in: filter.types };
@@ -87,9 +87,9 @@ function orderFor(kind: ItemFilter["orderBy"]): Prisma.ItemOrderByWithRelationIn
   }
 }
 
-export async function listItems(workspaceId: string, filter: ItemFilter = {}) {
+export async function listItems(filter: ItemFilter = {}) {
   const rows = await db.item.findMany({
-    where: itemWhere(workspaceId, filter),
+    where: itemWhere(filter),
     select: itemRowSelect,
     orderBy: orderFor(filter.orderBy),
     take: filter.take,
@@ -123,9 +123,9 @@ export function sortByUrgency<T extends { dueDate: Date | null; priority: string
 }
 
 /** Item con todo su contexto: subtareas, comentarios, adjuntos. */
-export async function getItem(workspaceId: string, itemId: string) {
+export async function getItem(itemId: string) {
   const item = await db.item.findFirst({
-    where: { id: itemId, workspaceId },
+    where: { id: itemId },
     select: {
       ...itemRowSelect,
       convertedFromId: true,
@@ -182,13 +182,11 @@ export type ItemDetail = NonNullable<Awaited<ReturnType<typeof getItem>>>;
  * equipo. Es la vista de "qué tengo que hacer yo".
  */
 export async function myTasks(
-  workspaceId: string,
   userId: string,
   options: { includeDone?: boolean; take?: number } = {},
 ) {
   const rows = await db.item.findMany({
     where: {
-      workspaceId,
       type: "task",
       project: { archivedAt: null },
       ...(options.includeDone ? {} : { status: { in: OPEN_TASK_STATUSES } }),
@@ -239,16 +237,14 @@ export function bucketTasks(tasks: ItemRow[]): MyTaskBuckets {
   return buckets;
 }
 
-/** Reparte el trabajo abierto del workspace por persona. */
-export async function workloadByPerson(workspaceId: string) {
+/** Reparte el trabajo abierto del equipo por persona. */
+export async function workloadByPerson() {
   const [members, tasks] = await Promise.all([
     db.membership.findMany({
-      where: { workspaceId },
       select: { user: { select: personSelect } },
     }),
     db.item.findMany({
       where: {
-        workspaceId,
         type: "task",
         status: { in: OPEN_TASK_STATUSES },
         project: { archivedAt: null },

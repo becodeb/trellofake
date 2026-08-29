@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Exposes Hilo workspace data to AI clients over the Model Context Protocol (Streamable HTTP) at `/api/mcp`. The endpoint authenticates requests with workspace API tokens and serves read-only tool calls scoped to the token's workspace.
+Exposes Hilo team data to AI clients over the Model Context Protocol (Streamable HTTP) at `/api/mcp`. The endpoint authenticates requests with API tokens and serves read-only tool calls scoped to the singleton team.
 
 ## Requirements
 
@@ -25,11 +25,11 @@ The system MUST expose an MCP server at `/api/mcp` using the Streamable HTTP tra
 
 ### Requirement: Bearer token authentication
 
-The system MUST require an `Authorization: Bearer <token>` header on every request and MUST look up the token by the sha256 hash of the presented value. The server MUST respond HTTP 401 when the header is missing or unknown, when the token is expired, or when the token is revoked. The server MUST respond HTTP 403 when the token is valid but its user is no longer a member of the token's workspace.
+The system MUST require an `Authorization: Bearer <token>` header on every request and MUST look up the token by the sha256 hash of the presented value. The server MUST respond HTTP 401 when the header is missing or unknown, when the token is expired, or when the token is revoked. The server MUST respond HTTP 403 when the token is valid but its user no longer holds a global membership.
 
 #### Scenario: Valid token
 
-- GIVEN a non-expired, non-revoked token whose user is an active member
+- GIVEN a non-expired, non-revoked token whose user holds a global membership
 - WHEN a request carries `Authorization: Bearer <token>`
 - THEN the request is authenticated and served
 
@@ -40,21 +40,22 @@ The system MUST require an `Authorization: Bearer <token>` header on every reque
 - THEN the server responds HTTP 401
 - AND the request is not served
 
-#### Scenario: Token user left the workspace
+#### Scenario: Token user removed from the team
 
-- GIVEN a valid, non-expired token whose user was removed from the workspace
+- GIVEN a valid, non-expired token whose user's membership was removed
 - WHEN a request presents it
 - THEN the server responds HTTP 403
 
-### Requirement: Token-derived workspace scoping
+### Requirement: Token-derived team scoping
 
-The system MUST derive the workspace context (workspaceId and role) exclusively from the `ApiToken` row matched by the bearer token. Client-supplied workspace identifiers in tool arguments MUST NOT override this scope — they MUST be rejected or ignored. Every query issued by the tools MUST be hard-scoped to the token's workspaceId.
+The system MUST derive the team context (team identity and role) exclusively from the `ApiToken` row matched by the bearer token. Client-supplied team or workspace identifiers in tool arguments MUST NOT override this scope — they MUST be rejected or ignored. Tool queries MUST target the singleton team; no `workspaceId` filter applies.
 
-#### Scenario: Token scopes all reads
+#### Scenario: Token resolves the singleton team
 
-- GIVEN a token for workspace W1
-- WHEN a tool call passes arguments nominating workspace W2
-- THEN results only ever reference W1 data
+- GIVEN a valid token
+- WHEN any tool call executes
+- THEN results reference the singleton team's data
+- AND no workspace-scoped filter is applied
 
 ### Requirement: Read-only tool dispatch
 

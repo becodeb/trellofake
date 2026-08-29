@@ -1,19 +1,14 @@
 import "server-only";
 
 import { db } from "@/server/db";
-import { isTeamRole } from "@/lib/domain";
 import { readRemoteMarkdown } from "@/lib/resources";
 
 export async function listKnowledgeResources(
-  workspaceId: string,
-  viewer: { role: string; userId: string },
   projectId?: string,
 ) {
   const resources = await db.knowledgeResource.findMany({
     where: {
-      workspaceId,
       ...(projectId ? { projectId } : {}),
-      ...(isTeamRole(viewer.role) ? {} : { visibility: "community" }),
     },
     select: {
       id: true,
@@ -24,7 +19,6 @@ export async function listKnowledgeResources(
       accessGuide: true,
       markdown: true,
       markdownUrl: true,
-      visibility: true,
       project: { select: { id: true, name: true } },
       addedBy: { select: { name: true } },
     },

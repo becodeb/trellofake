@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Read-only MCP tools (`hilo_*`) exposing workspace content to AI clients. Every tool honors project visibility through the token role and is hard-scoped to the token's workspace.
+Read-only MCP tools (`hilo_*`) exposing team content to AI clients. Every tool is hard-scoped to the singleton team and is not subject to per-role visibility filtering.
 
 ## Requirements
 
 ### Requirement: Tool coverage
 
-The system MUST expose `hilo_*` read tools covering: projects with their subproject tree; items of all six `ItemType` (`task`, `idea`, `note`, `problem`, `decision`, `update`) with filters; proposals with their replies; knowledge resources with their access/integration guides; people; workspace feed/activity; and search.
+The system MUST expose `hilo_*` read tools covering: projects with their subproject tree; items of all six `ItemType` (`task`, `idea`, `note`, `problem`, `decision`, `update`) with filters; proposals with their replies; knowledge resources with their access/integration guides; people; team feed/activity; and search.
 
 #### Scenario: tools/list enumerates the read tools
 
@@ -18,46 +18,30 @@ The system MUST expose `hilo_*` read tools covering: projects with their subproj
 
 #### Scenario: Tree includes subprojects
 
-- GIVEN a workspace with nested projects
+- GIVEN a team with nested projects
 - WHEN the projects tool runs
 - THEN each project returned includes its subproject tree
 
 #### Scenario: Item filters cover all six types
 
-- GIVEN a workspace containing items of all six types
+- GIVEN a team containing items of all six types
 - WHEN the items tool runs with a `type` filter
 - THEN results are limited to that `ItemType` and valid filters are applied
 
-### Requirement: Visibility enforcement
+### Requirement: Team scoping
 
-Every tool MUST honor project visibility by passing the token role and user into the existing viewer parameters (e.g. `projectAccess`, `listKnowledgeResources`), so the rules from `src/lib/domain.ts` (`PROJECT_VISIBILITIES`, `isTeamRole`) apply unchanged. A token whose role is `community` MUST only see `community`-visible projects and resources plus their dependent content; `admin` and `developer` tokens MUST see team content as well.
+Each tool MUST resolve all queries against the singleton team without `workspaceId` scoping. Tools MUST NOT filter by workspace, and identifiers always reference the single team's data.
 
-#### Scenario: Community role sees only community content
+#### Scenario: Identifiers resolve within the team
 
-- GIVEN a token whose role is `community`
-- WHEN any read tool runs
-- THEN results exclude team-only projects and resources
-- AND derived content (items, proposals, feed, search) is filtered to visible projects
-
-#### Scenario: Team role sees team content
-
-- GIVEN a token whose role is `developer` or `admin`
-- WHEN any read tool runs
-- THEN team and community content are both included
-
-### Requirement: Workspace scoping
-
-Each tool MUST scope all queries to the token's `workspaceId` (derived by mcp-server). Identifiers pointing outside the token's workspace MUST yield no data for that identifier.
-
-#### Scenario: Foreign identifiers yield no data
-
-- GIVEN a token for workspace W1
-- WHEN a tool receives an item or project identifier belonging to W2
-- THEN the result contains no data for that identifier
+- GIVEN an authenticated MCP session
+- WHEN a tool receives an item or project identifier
+- THEN the result contains that identifier's data
+- AND no workspace filter is applied
 
 ### Requirement: Input validation
 
-Each tool MUST validate its arguments with Zod against the vocabulary in `src/lib/domain.ts` (`isItemType`, `isValidStatus`, `PROPOSAL_STATUSES`, `RESOURCE_KINDS`, `PRIORITIES`, `PROJECT_VISIBILITIES`, search kinds). Invalid or unknown filter values MUST produce a JSON-RPC invalid-params error rather than empty results.
+Each tool MUST validate its arguments with Zod against the vocabulary in `src/lib/domain.ts` (`isItemType`, `isValidStatus`, `PROPOSAL_STATUSES`, `RESOURCE_KINDS`, `PRIORITIES`, search kinds). Invalid or unknown filter values MUST produce a JSON-RPC invalid-params error rather than empty results.
 
 #### Scenario: Invalid item type filter
 

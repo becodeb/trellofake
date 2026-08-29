@@ -1,12 +1,9 @@
 "use server";
-
 import { z } from "zod";
-
 import { db } from "@/server/db";
-import { requireWorkspaceAction } from "@/server/auth/context";
+import { requireTeamAction } from "@/server/auth/context";
 import { createApiToken } from "@/server/auth/token";
-import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
-
+import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 const createSchema = z.object({
   expiresAt: z.coerce
     .date({ error: "La fecha de expiración es obligatoria." })
@@ -17,41 +14,37 @@ const createSchema = z.object({
  * Crea un token de acceso API para clientes MCP y devuelve el valor crudo
  * exactamente una vez (solo el hash queda persistido).
  */
+
 export async function createApiTokenAction(
-  slug: string,
   raw: unknown,
 ): Promise<ActionResult<{ rawToken: string }>> {
   return run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "api-tokens.create");
+    const ctx = await requireTeamAction("api-tokens.create");
     const input = createSchema.parse(raw);
-
     const created = await createApiToken({
-      workspaceId: ctx.workspace.id,
       userId: ctx.user.id,
       expiresAt: input.expiresAt,
     });
-
-    revalidateWorkspace(slug);
+    revalidateTeam();
     return { rawToken: created.raw };
   });
 }
 
 /**
  * Revocación soft: marca `revoked` y todo uso posterior del token recibe 401.
- * Revocar un token desconocido (o de otro workspace) es error.
+ * Revocar un token desconocido es error.
  */
-export async function revokeApiToken(slug: string, tokenId: string): Promise<ActionResult> {
-  const result = await run(async () => {
-    const ctx = await requireWorkspaceAction(slug, "api-tokens.revoke");
-    const parsed = z.string().min(1).parse(tokenId);
 
+export async function revokeApiToken(tokenId: string): Promise<ActionResult> {
+  const result = await run(async () => {
+    await requireTeamAction("api-tokens.revoke");
+    const parsed = z.string().min(1).parse(tokenId);
     const token = await db.apiToken.findUnique({ where: { id: parsed } });
-    if (!token || token.workspaceId !== ctx.workspace.id) {
+    if (!token) {
       throw new Error("Ese token no existe.");
     }
-
     await db.apiToken.update({ where: { id: parsed }, data: { revoked: true } });
-    revalidateWorkspace(slug);
+    revalidateTeam();
   });
   return result.ok ? ok() : result;
 }

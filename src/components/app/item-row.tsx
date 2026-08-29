@@ -25,13 +25,11 @@ import { Tooltip } from "@/components/ui/overlays";
  */
 export function ItemRow({
   item,
-  slug,
   showProject = false,
   indent = 0,
   compact = false,
 }: {
   item: ItemRowData;
-  slug: string;
   showProject?: boolean;
   indent?: number;
   compact?: boolean;
@@ -59,7 +57,7 @@ export function ItemRow({
     const previous = status;
     setStatus(value); // optimista: la fila responde antes que el servidor
     startTransition(async () => {
-      const result = await setItemStatus(slug, item.id, value);
+      const result = await setItemStatus(item.id, value);
       if (!result.ok) {
         setStatus(previous);
         toast.error(result.error);
@@ -223,7 +221,6 @@ function Assignees({ item }: { item: ItemRowData }) {
  * cinco veces un formulario.
  */
 export function InlineComposer({
-  slug,
   projectId,
   type = "task",
   parentId,
@@ -231,7 +228,6 @@ export function InlineComposer({
   onCreated,
   className,
 }: {
-  slug: string;
   projectId: string;
   type?: ItemType;
   parentId?: string;
@@ -249,7 +245,7 @@ export function InlineComposer({
     if (!title || pending) return;
 
     setPending(true);
-    const result = await createItem(slug, {
+    const result = await createItem({
       projectId,
       type,
       title,

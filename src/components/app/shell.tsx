@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { LogOut, Menu, Moon, Search, Sun, User as UserIcon } from "lucide-react";
+import { LogIn, LogOut, Menu, Moon, Search, Sun, User as UserIcon, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { logout } from "@/server/actions/auth";
@@ -25,11 +25,13 @@ import type { ProjectOption } from "@/components/app/pickers";
 import type { ProjectNode } from "@/server/domain/projects";
 
 export type ShellProps = {
-  slug: string;
-  workspaceName: string;
-  user: PersonLike & { email?: string };
+  teamName: string;
+  /** null cuando no hay sesión: el shell se sirve igual, público. */
+  user: (PersonLike & { email?: string }) | null;
   role: string;
+  isGuest: boolean;
   canManage: boolean;
+  canWork: boolean;
   projects: ProjectNode[];
   projectOptions: ProjectOption[];
   members: PersonLike[];
@@ -43,13 +45,17 @@ export type ShellProps = {
  * derecha. En pantallas chicas la navegación pasa a ser un cajón, porque una
  * herramienta de trabajo tiene que poder consultarse desde el teléfono aunque
  * se use sentado.
+ *
+ * Los visitantes sin sesión navegan igual: ven los CTAs Ingresar/Registrarte
+ * en lugar del menú de usuario, y las acciones de escritura quedan ocultas.
  */
 export function AppShell({
-  slug,
-  workspaceName,
+  teamName,
   user,
   role,
+  isGuest,
   canManage,
+  canWork,
   projects,
   projectOptions,
   members,
@@ -76,15 +82,16 @@ export function AppShell({
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        if (!canWork) return;
         setPaletteOpen((v) => !v);
         return;
       }
       if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === "c") {
+      if (event.key === "c" && canWork) {
         event.preventDefault();
         setCreateOpen(true);
       }
-      if (event.key === "/") {
+      if (event.key === "/" && canWork) {
         event.preventDefault();
         setPaletteOpen(true);
       }
@@ -92,25 +99,28 @@ export function AppShell({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [canWork]);
 
   const nav = (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
         <Sidebar
-          slug={slug}
-          workspaceName={workspaceName}
+          teamName={teamName}
           projects={projects}
           unread={unread}
           myOpenTasks={myOpenTasks}
           canManage={canManage}
-          canWork={role !== "community"}
+          canWork={canWork}
           onSearch={() => setPaletteOpen(true)}
           onCreate={() => setCreateOpen(true)}
           onNavigate={() => setDrawerOpen(false)}
         />
       </div>
-      <UserMenu user={user} role={role} slug={slug} />
+      {user ? (
+        <UserMenu user={user} role={role} />
+      ) : (
+        <GuestMenu />
+      )}
     </div>
   );
 
@@ -143,8 +153,8 @@ export function AppShell({
           >
             <Menu className="size-4.5" strokeWidth={1.9} />
           </button>
-          <span className="truncate text-sm font-medium text-ink">{workspaceName}</span>
-          {role !== "community" && (
+          <span className="truncate text-sm font-medium text-ink">{teamName}</span>
+          {canWork && (
             <button
               onClick={() => setPaletteOpen(true)}
               className="ml-auto grid size-8 place-items-center rounded-[var(--r-md)] text-ink-2 transition-colors hover:bg-surface-2"
@@ -158,19 +168,17 @@ export function AppShell({
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      {role !== "community" && (
+      {canWork && (
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
-          slug={slug}
           canManage={canManage}
         />
       )}
-      {role !== "community" && (
+      {canWork && (
         <QuickCreate
           open={createOpen}
           onOpenChange={setCreateOpen}
-          slug={slug}
           projects={projectOptions}
           members={members}
         />
@@ -179,15 +187,7 @@ export function AppShell({
   );
 }
 
-function UserMenu({
-  user,
-  role,
-  slug,
-}: {
-  user: PersonLike & { email?: string };
-  role: string;
-  slug: string;
-}) {
+function UserMenu({ user, role }: { user: PersonLike & { email?: string }; role: string }) {
   const router = useRouter();
   const [dark, setDark] = React.useState(false);
 
@@ -221,7 +221,7 @@ function UserMenu({
 
         <MenuContent align="start" side="top" className="w-[212px]">
           <MenuLabel>{user.email}</MenuLabel>
-          <MenuItem onSelect={() => router.push(`/w/${slug}/perfil`)}>
+          <MenuItem onSelect={() => router.push("/perfil")}>
             <UserIcon className="size-3.5" strokeWidth={1.9} />
             Mi perfil
           </MenuItem>
@@ -245,6 +245,28 @@ function UserMenu({
           </MenuItem>
         </MenuContent>
       </DropMenu>
+    </div>
+  );
+}
+
+/** Visitante sin sesión: entrar o crearse una cuenta, nada más. */
+function GuestMenu() {
+  return (
+    <div className="space-y-1 border-t border-line-soft p-2">
+      <Link
+        href="/login"
+        className="flex h-8 w-full items-center gap-2 rounded-[var(--r-md)] px-2 text-sm font-medium text-accent-ink transition-colors hover:bg-surface-2"
+      >
+        <LogIn className="size-3.5" strokeWidth={1.9} />
+        Ingresar
+      </Link>
+      <Link
+        href="/signup"
+        className="flex h-8 w-full items-center justify-center gap-2 rounded-[var(--r-md)] bg-accent px-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
+      >
+        <UserPlus className="size-3.5" strokeWidth={1.9} />
+        Registrarte
+      </Link>
     </div>
   );
 }

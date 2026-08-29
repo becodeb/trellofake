@@ -8,8 +8,8 @@ import { Check, Copy, KeyRound, MoreHorizontal, UserPlus } from "lucide-react";
 
 import { ROLE_LABEL, WORKSPACE_ROLES, type WorkspaceRole } from "@/lib/domain";
 import { relativeTime } from "@/lib/format";
-import { addMember, removeMember, setMemberRole } from "@/server/actions/workspace";
-import type { WorkspaceMember } from "@/server/domain/dashboard";
+import { addMember, removeMember, setMemberRole } from "@/server/actions/team";
+import type { TeamMember } from "@/server/domain/dashboard";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -33,19 +33,17 @@ import {
  * admin una sola vez para que se la pase: nadie elige la contraseña de otro.
  */
 export function MemberList({
-  slug,
   members,
   viewerId,
 }: {
-  slug: string;
-  members: WorkspaceMember[];
+  members: TeamMember[];
   viewerId: string;
 }) {
   const router = useRouter();
   const [inviting, setInviting] = React.useState(false);
 
   const changeRole = async (userId: string, role: string) => {
-    const result = await setMemberRole(slug, userId, role);
+    const result = await setMemberRole(userId, role);
     if (!result.ok) toast.error(result.error);
     else {
       toast.success("Rol actualizado");
@@ -54,7 +52,7 @@ export function MemberList({
   };
 
   const remove = async (userId: string, name: string) => {
-    const result = await removeMember(slug, userId);
+    const result = await removeMember(userId);
     if (!result.ok) toast.error(result.error);
     else {
       toast.success(`${name} salió del equipo`);
@@ -74,7 +72,7 @@ export function MemberList({
 
             <div className="min-w-0 flex-1">
               <Link
-                href={`/w/${slug}/gente/${member.user.id}`}
+                href={`/gente/${member.user.id}`}
                 className="block truncate text-sm font-medium text-ink hover:underline"
               >
                 {member.user.name}
@@ -145,17 +143,15 @@ export function MemberList({
         sigue los proyectos visibles, comenta y propone ideas.
       </p>
 
-      <AddMemberDialog slug={slug} open={inviting} onOpenChange={setInviting} />
+      <AddMemberDialog open={inviting} onOpenChange={setInviting} />
     </>
   );
 }
 
 function AddMemberDialog({
-  slug,
   open,
   onOpenChange,
 }: {
-  slug: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -181,7 +177,7 @@ function AddMemberDialog({
   const submit = async () => {
     if (pending) return;
     setPending(true);
-    const result = await addMember(slug, { name, email, role, title: title || undefined });
+    const result = await addMember({ name, email, role, title: title || undefined });
     setPending(false);
 
     if (!result.ok) {

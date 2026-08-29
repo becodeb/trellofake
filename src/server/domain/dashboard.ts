@@ -6,12 +6,12 @@ import { itemRowSelect } from "@/server/domain/items";
 import { ACTIVE_TASK_STATUSES, OPEN_TASK_STATUSES } from "@/lib/domain";
 
 /**
- * Números del workspace.
+ * Números del equipo.
  *
  * La regla acá es que cada número responda una pregunta que alguien se hace de
  * verdad al entrar. Si no responde nada, no va.
  */
-export type WorkspaceStats = {
+export type TeamStats = {
   activeProjects: number;
   pausedProjects: number;
   finishedProjects: number;
@@ -24,10 +24,10 @@ export type WorkspaceStats = {
   overallProgress: number;
 };
 
-export async function workspaceStats(workspaceId: string): Promise<WorkspaceStats> {
+export async function teamStats(): Promise<TeamStats> {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const live = { workspaceId, project: { archivedAt: null } } as const;
+  const live = { project: { archivedAt: null } } as const;
 
   const [
     activeProjects,
@@ -40,9 +40,9 @@ export async function workspaceStats(workspaceId: string): Promise<WorkspaceStat
     completedThisWeek,
     activeProgress,
   ] = await Promise.all([
-    db.project.count({ where: { workspaceId, status: "active", archivedAt: null, parentId: null } }),
-    db.project.count({ where: { workspaceId, status: "paused", archivedAt: null, parentId: null } }),
-    db.project.count({ where: { workspaceId, status: "done", parentId: null } }),
+    db.project.count({ where: { status: "active", archivedAt: null, parentId: null } }),
+    db.project.count({ where: { status: "paused", archivedAt: null, parentId: null } }),
+    db.project.count({ where: { status: "done", parentId: null } }),
     db.item.count({ where: { ...live, type: "task", status: { in: OPEN_TASK_STATUSES } } }),
     db.item.count({ where: { ...live, type: "task", status: { in: ACTIVE_TASK_STATUSES } } }),
     db.item.count({
@@ -58,7 +58,7 @@ export async function workspaceStats(workspaceId: string): Promise<WorkspaceStat
       where: { ...live, type: "task", status: "done", completedAt: { gte: weekAgo } },
     }),
     db.project.aggregate({
-      where: { workspaceId, status: "active", archivedAt: null, parentId: null },
+      where: { status: "active", archivedAt: null, parentId: null },
       _avg: { progress: true },
     }),
   ]);
@@ -77,11 +77,10 @@ export async function workspaceStats(workspaceId: string): Promise<WorkspaceStat
 }
 
 /** Lo que está frenado: la pregunta más urgente al entrar. */
-export async function blockedWork(workspaceId: string, take = 5) {
+export async function blockedWork(take = 5) {
   const [tasks, problems] = await Promise.all([
     db.item.findMany({
       where: {
-        workspaceId,
         type: "task",
         status: "blocked",
         project: { archivedAt: null },
@@ -92,7 +91,6 @@ export async function blockedWork(workspaceId: string, take = 5) {
     }),
     db.item.findMany({
       where: {
-        workspaceId,
         type: "problem",
         status: { in: ["open", "investigating"] },
         project: { archivedAt: null },
@@ -106,9 +104,9 @@ export async function blockedWork(workspaceId: string, take = 5) {
 }
 
 /** Decisiones recientes: la memoria que un equipo suele perder. */
-export async function recentDecisions(workspaceId: string, take = 4) {
+export async function recentDecisions(take = 4) {
   return db.item.findMany({
-    where: { workspaceId, type: "decision", project: { archivedAt: null } },
+    where: { type: "decision", project: { archivedAt: null } },
     select: {
       id: true,
       title: true,
@@ -124,9 +122,9 @@ export async function recentDecisions(workspaceId: string, take = 4) {
 }
 
 /** Últimos avances publicados por el equipo ("esto hice hoy"). */
-export async function recentUpdates(workspaceId: string, take = 5) {
+export async function recentUpdates(take = 5) {
   return db.item.findMany({
-    where: { workspaceId, type: "update", project: { archivedAt: null } },
+    where: { type: "update", project: { archivedAt: null } },
     select: {
       id: true,
       title: true,
@@ -142,9 +140,8 @@ export async function recentUpdates(workspaceId: string, take = 5) {
   });
 }
 
-export async function workspaceMembers(workspaceId: string) {
+export async function teamMembers() {
   return db.membership.findMany({
-    where: { workspaceId },
     select: {
       id: true,
       role: true,
@@ -157,4 +154,4 @@ export async function workspaceMembers(workspaceId: string) {
   });
 }
 
-export type WorkspaceMember = Awaited<ReturnType<typeof workspaceMembers>>[number];
+export type TeamMember = Awaited<ReturnType<typeof teamMembers>>[number];

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
 /** Caja de búsqueda de la página de resultados: navega, no consulta en vivo. */
-export function SearchBox({ slug, initial }: { slug: string; initial: string }) {
+export function SearchBox({ initial }: { initial: string }) {
   const router = useRouter();
   const [value, setValue] = React.useState(initial);
 
@@ -16,7 +16,7 @@ export function SearchBox({ slug, initial }: { slug: string; initial: string }) 
       onSubmit={(event) => {
         event.preventDefault();
         const q = value.trim();
-        router.push(q ? `/w/${slug}/buscar?q=${encodeURIComponent(q)}` : `/w/${slug}/buscar`);
+        router.push(q ? `/buscar?q=${encodeURIComponent(q)}` : `/buscar`);
       }}
       className="flex items-center gap-2.5 rounded-[var(--r-md)] border border-line bg-surface px-3 transition-[border-color,box-shadow] focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-wash)]"
     >
