@@ -57,7 +57,7 @@ function unauthorized() {
 
 function forbidden() {
   return Response.json(
-    { error: "El usuario del token ya no es miembro de este workspace." },
+    { error: "El usuario del token ya no es miembro del equipo." },
     { status: 403, headers: { "content-type": "application/json" } },
   );
 }

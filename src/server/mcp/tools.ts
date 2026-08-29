@@ -7,15 +7,13 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { db } from "@/server/db";
 import { listProjects, getProject } from "@/server/domain/projects";
 import { listItems, getItem } from "@/server/domain/items";
-import { workspaceFeed } from "@/server/domain/feed";
+import { teamFeed } from "@/server/domain/feed";
 import { search } from "@/server/domain/search";
 import { listKnowledgeResources } from "@/server/domain/resources";
-import { workspaceMembers } from "@/server/domain/dashboard";
-import { filterVisibleHits, toWire, visibleProjectIds } from "@/server/mcp/visibility";
+import { teamMembers } from "@/server/domain/dashboard";
 import type { TokenContext } from "@/server/auth/token";
 import {
   ITEM_TYPES,
-  isTeamRole,
   PROPOSAL_STATUSES,
   PROJECT_STATUSES,
   IDEA_STATUSES,
@@ -29,9 +27,11 @@ import { SEARCH_KIND_LABEL, type SearchKind } from "@/lib/shared";
  * Herramientas de lectura `hilo_*` (mcp-read-tools).
  *
  * Contexto por request vía AsyncLocalStorage: la ruta corre `handleRequest`
- * dentro de `tokenContextStore.run(ctx, ...)` y cada handler lee su workspace
- * y su rol de ahí — nunca de los argumentos del cliente. Todas las queries van
- * hard-scoped al `workspaceId` del token.
+ * dentro de `tokenContextStore.run(ctx, ...)` y cada handler lee su equipo y
+ * su rol de ahí — nunca de los argumentos del cliente. Todas las queries
+ * apuntan al equipo único de la instancia: no hay filtro de workspace ni
+ * post-filtros de visibilidad (todo el contenido es público; el rol solo
+ * existe para el contrato de capacidades).
  */
 export const tokenContextStore = new AsyncLocalStorage<TokenContext>();
 
@@ -39,6 +39,33 @@ function ctx(): TokenContext {
   const context = tokenContextStore.getStore();
   if (!context) throw new Error("MCP: contexto de token ausente.");
   return context;
+}
+
+/**
+ * Sanitiza una respuesta de dominio antes de exponerla por MCP:
+ * los `Date` pasan a ISO 8601 y los campos internos (`storageKey`, claves de
+ * almacenamiento) se eliminan. Nunca exponer rutas de storage ni campos
+ * internos.
+ */
+function toWire<T>(value: T): T {
+  const seen = new WeakSet<object>();
+  const walk = (node: unknown): unknown => {
+    if (node instanceof Date) return node.toISOString();
+    if (Array.isArray(node)) return node.map(walk);
+    if (node && typeof node === "object") {
+      if (seen.has(node)) return undefined;
+      seen.add(node);
+      const out: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key === "storageKey") continue;
+        const cleaned = walk(value);
+        if (cleaned !== undefined) out[key] = cleaned;
+      }
+      return out;
+    }
+    return node;
+  };
+  return walk(value) as T;
 }
 
 /** Respuesta de texto JSON, pasada por `toWire` (sin storageKeys, fechas ISO). */
@@ -69,18 +96,17 @@ export function registerTools(server: McpServer) {
     "hilo_list_projects",
     {
       description:
-        "Lista los proyectos del workspace con su subárbol de subproyectos, progreso, estado y membresía. Respeta la visibilidad del rol del token.",
+        "Lista los proyectos del equipo con su subárbol de subproyectos, progreso, estado y membresía.",
       inputSchema: {
         statuses: z.array(z.enum(PROJECT_STATUSES)).optional(),
         archived: z.boolean().optional(),
       },
     },
     async (args: { statuses?: string[]; archived?: boolean }) => {
-      const c = ctx();
-      const rows = await listProjects(c.workspace.id, {
+      ctx();
+      const rows = await listProjects({
         statuses: args.statuses,
         archived: args.archived,
-        viewer: { role: c.role, userId: c.user.id },
       });
       return textResult(rows);
     },
@@ -90,15 +116,12 @@ export function registerTools(server: McpServer) {
     "hilo_get_project",
     {
       description:
-        "Devuelve un proyecto por id con sus ancestros, subproyectos y enlaces. null si no existe o no es visible para el token.",
+        "Devuelve un proyecto por id con sus ancestros, subproyectos y enlaces. null si no existe.",
       inputSchema: { projectId: z.string().min(1) },
     },
     async (args: { projectId: string }) => {
-      const c = ctx();
-      const project = await getProject(c.workspace.id, args.projectId, {
-        role: c.role,
-        userId: c.user.id,
-      });
+      ctx();
+      const project = await getProject(args.projectId);
       return textResult(project);
     },
   );
@@ -109,7 +132,7 @@ export function registerTools(server: McpServer) {
     "hilo_list_items",
     {
       description:
-        "Lista elementos (task, idea, note, problem, decision, update) con sus filtros. projectId de otro workspace o no visible devuelve una lista vacía.",
+        "Lista elementos (task, idea, note, problem, decision, update) con sus filtros.",
       inputSchema: {
         type: z.enum(ITEM_TYPES).optional(),
         statuses: z.array(z.enum(ALL_STATUSES as [string, ...string[]])).optional(),
@@ -120,25 +143,9 @@ export function registerTools(server: McpServer) {
     async (
       args: { type?: ItemType; statuses?: string[]; projectId?: string; take?: number },
     ) => {
-      const c = ctx();
-      const teamView = isTeamRole(c.role);
-      const viewer = { role: c.role, userId: c.user.id };
-
-      let projectIds: string[] | undefined;
-      if (args.projectId) {
-        if (teamView || (await visibleProjectIds(c.workspace.id, viewer)).has(args.projectId)) {
-          projectIds = [args.projectId];
-        } else {
-          projectIds = [];
-        }
-      } else if (!teamView) {
-        // Sin projectId y rol no-team: acotar a los proyectos visibles (D1),
-        // mismo patrón que hilo_get_feed para comunidad.
-        projectIds = Array.from(await visibleProjectIds(c.workspace.id, viewer));
-      }
-
-      const rows = await listItems(c.workspace.id, {
-        projectIds,
+      ctx();
+      const rows = await listItems({
+        projectIds: args.projectId ? [args.projectId] : undefined,
         types: args.type ? [args.type] : undefined,
         statuses: args.statuses,
         take: args.take,
@@ -151,20 +158,12 @@ export function registerTools(server: McpServer) {
     "hilo_get_item",
     {
       description:
-        "Devuelve un elemento por id con comentarios, adjuntos y subtareas. null si no existe o su proyecto no es visible para el token.",
+        "Devuelve un elemento por id con comentarios, adjuntos y subtareas. null si no existe.",
       inputSchema: { itemId: z.string().min(1) },
     },
     async (args: { itemId: string }) => {
-      const c = ctx();
-      const item = await getItem(c.workspace.id, args.itemId);
-      if (!item) return textResult(null);
-
-      const visible = await visibleProjectIds(c.workspace.id, {
-        role: c.role,
-        userId: c.user.id,
-      });
-      if (!visible.has(item.projectId)) return textResult(null);
-
+      ctx();
+      const item = await getItem(args.itemId);
       return textResult(item);
     },
   );
@@ -175,18 +174,16 @@ export function registerTools(server: McpServer) {
     "hilo_list_proposals",
     {
       description:
-        "Lista las propuestas de la comunidad con sus respuestas. El workspace sale del token; targetProject solo se incluye si el rol puede escribir contenido o el proyecto es comunitario.",
+        "Lista las propuestas de la comunidad con sus respuestas. El equipo sale del token.",
       inputSchema: {
         status: z.enum(PROPOSAL_STATUSES).optional(),
         take,
       },
     },
     async (args: { status?: string; take?: number }) => {
-      const c = ctx();
+      ctx();
       const proposals = await db.proposal.findMany({
         where: {
-          // Hard-scoped al workspace del token — nunca del cliente.
-          workspaceId: c.workspace.id,
           ...(args.status ? { status: args.status } : {}),
         },
         select: {
@@ -200,7 +197,7 @@ export function registerTools(server: McpServer) {
           author: {
             select: { id: true, name: true, avatarUrl: true, accentColor: true },
           },
-          targetProject: { select: { id: true, name: true, visibility: true } },
+          targetProject: { select: { id: true, name: true } },
           promotedProject: { select: { id: true, name: true } },
           replies: {
             select: {
@@ -216,18 +213,7 @@ export function registerTools(server: McpServer) {
         take: args.take,
       });
 
-      // Mismo criterio que la página de ideas: el proyecto destino solo se
-      // muestra si el viewer puede escribir o es comunitario.
-      const safe = proposals.map((proposal) => ({
-        ...proposal,
-        targetProject:
-          proposal.targetProject &&
-          (c.can("content.write") || proposal.targetProject.visibility === "community")
-            ? proposal.targetProject
-            : null,
-      }));
-
-      return textResult(safe);
+      return textResult(proposals);
     },
   );
 
@@ -237,19 +223,12 @@ export function registerTools(server: McpServer) {
     "hilo_list_resources",
     {
       description:
-        "Lista los recursos de conocimiento (bases de datos, APIs, repositorios, guías de acceso...). Un projectId no visible devuelve una lista vacía.",
+        "Lista los recursos de conocimiento (bases de datos, APIs, repositorios, guías de acceso...).",
       inputSchema: { projectId: z.string().min(1).optional() },
     },
     async (args: { projectId?: string }) => {
-      const c = ctx();
-      const viewer = { role: c.role, userId: c.user.id };
-
-      if (args.projectId && !isTeamRole(c.role)) {
-        const visible = await visibleProjectIds(c.workspace.id, viewer);
-        if (!visible.has(args.projectId)) return textResult([]);
-      }
-
-      const rows = await listKnowledgeResources(c.workspace.id, viewer, args.projectId);
+      ctx();
+      const rows = await listKnowledgeResources(args.projectId);
       return textResult(rows);
     },
   );
@@ -259,12 +238,12 @@ export function registerTools(server: McpServer) {
   server.registerTool(
     "hilo_list_people",
     {
-      description: "Lista las personas del workspace con su rol y título.",
+      description: "Lista las personas del equipo con su rol y título.",
       inputSchema: { take },
     },
     async (args: { take?: number }) => {
-      const c = ctx();
-      const rows = await workspaceMembers(c.workspace.id);
+      ctx();
+      const rows = await teamMembers();
       return textResult(args.take ? rows.slice(0, args.take) : rows);
     },
   );
@@ -274,27 +253,17 @@ export function registerTools(server: McpServer) {
   server.registerTool(
     "hilo_get_feed",
     {
-      description:
-        "Actividad reciente del workspace. Los tokens de comunidad ven solo eventos de proyectos visibles; los de equipo ven todo.",
+      description: "Actividad reciente del equipo.",
       inputSchema: {
         take,
         before: z.iso.datetime().optional(),
       },
     },
     async (args: { take?: number; before?: string }) => {
-      const c = ctx();
-      const teamView = isTeamRole(c.role);
-
-      const projectIds = teamView
-        ? undefined
-        : Array.from(
-            await visibleProjectIds(c.workspace.id, { role: c.role, userId: c.user.id }),
-          );
-
-      const rows = await workspaceFeed(c.workspace.id, {
+      ctx();
+      const rows = await teamFeed({
         take: args.take,
         before: args.before ? new Date(args.before) : undefined,
-        projectIds,
       });
       return textResult(rows);
     },
@@ -305,8 +274,7 @@ export function registerTools(server: McpServer) {
   server.registerTool(
     "hilo_search",
     {
-      description:
-        "Búsqueda global en el workspace. Los tokens de comunidad no ven resultados de proyectos de equipo.",
+      description: "Búsqueda global en el equipo.",
       inputSchema: {
         query: z.string().trim().min(2, "El término de búsqueda tiene al menos 2 caracteres."),
         kinds: z.array(z.enum(SEARCH_KINDS)).optional(),
@@ -314,58 +282,12 @@ export function registerTools(server: McpServer) {
       },
     },
     async (args: { query: string; kinds?: SearchKind[]; limit?: number }) => {
-      const c = ctx();
-      const hits = await search(c.workspace.id, c.workspace.slug, args.query, {
+      ctx();
+      const hits = await search(args.query, {
         kinds: args.kinds,
         limit: args.limit,
       });
-
-      const teamView = isTeamRole(c.role);
-      if (teamView) return textResult(hits);
-
-      // Post-filtro de visibilidad (D1): los hits no traen projectId, así que
-      // el adaptador lo resuelve con una query extra y filtra en memoria.
-      const visible = await visibleProjectIds(c.workspace.id, {
-        role: c.role,
-        userId: c.user.id,
-      });
-
-      const itemIds = hits.filter((h) => (ITEM_TYPES as readonly string[]).includes(h.kind)).map((h) => h.id);
-      const commentIds = hits.filter((h) => h.kind === "comment").map((h) => h.id);
-      const fileIds = hits.filter((h) => h.kind === "file").map((h) => h.id);
-
-      const [items, comments, files] = await Promise.all([
-        itemIds.length
-          ? db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, projectId: true } })
-          : Promise.resolve([] as Array<{ id: string; projectId: string }>),
-        commentIds.length
-          ? db.comment.findMany({
-              where: { id: { in: commentIds } },
-              select: { id: true, projectId: true, item: { select: { projectId: true } } },
-            })
-          : Promise.resolve([] as Array<{ id: string; projectId: string; item: { projectId: string } | null }>),
-        fileIds.length
-          ? db.attachment.findMany({
-              where: { id: { in: fileIds } },
-              select: { id: true, projectId: true, item: { select: { projectId: true } } },
-            })
-          : Promise.resolve([] as Array<{ id: string; projectId: string; item: { projectId: string } | null }>),
-      ]);
-
-      const projectByHit = new Map<string, string | undefined>();
-      for (const item of items) projectByHit.set(item.id, item.projectId);
-      for (const comment of comments) {
-        projectByHit.set(comment.id, comment.item?.projectId ?? comment.projectId ?? undefined);
-      }
-      for (const file of files) {
-        projectByHit.set(file.id, file.item?.projectId ?? file.projectId ?? undefined);
-      }
-
-      const filtered = filterVisibleHits(
-        hits.map((hit) => ({ ...hit, projectId: projectByHit.get(hit.id) })),
-        visible,
-      );
-      return textResult(filtered);
+      return textResult(hits);
     },
   );
 }
