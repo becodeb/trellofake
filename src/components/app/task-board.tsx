@@ -33,12 +33,10 @@ import { InlineComposer } from "@/components/app/item-row";
  * servidor lo rechaza, la tarjeta vuelve sola a su lugar.
  */
 export function TaskBoard({
-  slug,
   projectId,
   tasks,
   canWrite,
 }: {
-  slug: string;
   projectId: string;
   tasks: ItemRowData[];
   canWrite: boolean;
@@ -77,7 +75,7 @@ export function TaskBoard({
       current.map((item) => (item.id === task.id ? { ...item, status: targetStatus } : item)),
     );
 
-    const result = await moveItem(slug, task.id, {
+    const result = await moveItem(task.id, {
       status: targetStatus,
       position: Date.now(),
     });
@@ -108,12 +106,11 @@ export function TaskBoard({
             count={column.items.length}
           >
             {column.items.map((task) => (
-              <Card key={task.id} task={task} slug={slug} draggable={canWrite} />
+              <Card key={task.id} task={task} draggable={canWrite} />
             ))}
 
             {canWrite && column.value === "todo" && (
               <InlineComposer
-                slug={slug}
                 projectId={projectId}
                 placeholder="Nueva tarea…"
                 className="rounded-[var(--r-md)] border border-dashed border-line px-2.5"
@@ -171,11 +168,9 @@ function Column({
 
 function Card({
   task,
-  slug,
   draggable,
 }: {
   task: ItemRowData;
-  slug: string;
   draggable: boolean;
 }) {
   const router = useRouter();

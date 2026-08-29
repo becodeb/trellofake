@@ -11,14 +11,8 @@ export function SignupForm() {
 
   return (
     <form action={formAction} className="space-y-3.5">
-      <Field label="Nombre del equipo" hint="Podés cambiarlo después.">
-        <Input name="workspaceName" placeholder="Estudio Cardinal" required autoFocus />
-      </Field>
-
-      <div className="h-px bg-line-soft" />
-
       <Field label="Tu nombre">
-        <Input name="name" autoComplete="name" placeholder="Ezequiel Fernández" required />
+        <Input name="name" autoComplete="name" placeholder="Ezequiel Fernández" required autoFocus />
       </Field>
 
       <Field label="Email">
@@ -45,7 +39,7 @@ export function SignupForm() {
       {state && !state.ok && <FormError>{state.error}</FormError>}
 
       <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending}>
-        Crear equipo
+        Crear cuenta
       </Button>
     </form>
   );

@@ -4,16 +4,14 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { updateWorkspace } from "@/server/actions/workspace";
+import { updateTeam } from "@/server/actions/team";
 import { Button } from "@/components/ui/button";
 import { AutoTextarea, Field, Input } from "@/components/ui/field";
 
-export function WorkspaceSettings({
-  slug,
+export function TeamSettings({
   name: initialName,
   mission: initialMission,
 }: {
-  slug: string;
   name: string;
   mission: string | null;
 }) {
@@ -26,7 +24,7 @@ export function WorkspaceSettings({
 
   const save = async () => {
     setPending(true);
-    const result = await updateWorkspace(slug, { name, mission: mission || null });
+    const result = await updateTeam({ name, mission: mission || null });
     setPending(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -56,7 +54,7 @@ export function WorkspaceSettings({
 
       <div className="flex items-center justify-between gap-3 border-t border-line-soft pt-3">
         <span className="text-2xs text-ink-4">
-          La dirección del workspace es <code className="font-mono">/w/{slug}</code>
+          Todo lo del equipo vive en la raíz de la app.
         </span>
         <Button variant="primary" size="sm" onClick={save} loading={pending} disabled={!dirty}>
           Guardar

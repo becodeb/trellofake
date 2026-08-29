@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CornerDownLeft, Trash2 } from "lucide-react";
@@ -29,7 +30,6 @@ export type CommentData = {
  * hace aparecer en sus novedades, así que la mención vale como aviso.
  */
 export function CommentThread({
-  slug,
   comments,
   members,
   viewerId,
@@ -37,14 +37,15 @@ export function CommentThread({
   projectId,
   emptyHint = "Todavía no hay comentarios.",
 }: {
-  slug: string;
   comments: CommentData[];
   members: PersonLike[];
-  viewerId: string;
+  viewerId: string | null;
   itemId?: string;
   projectId?: string;
   emptyHint?: string;
 }) {
+  const viewer = viewerId ? members.find((m) => m.id === viewerId) : undefined;
+
   return (
     <div className="space-y-3">
       {comments.length === 0 ? (
@@ -54,7 +55,6 @@ export function CommentThread({
           {comments.map((comment) => (
             <Comment
               key={comment.id}
-              slug={slug}
               comment={comment}
               members={members}
               canDelete={comment.author.id === viewerId}
@@ -63,24 +63,37 @@ export function CommentThread({
         </ul>
       )}
 
-      <CommentComposer
-        slug={slug}
-        members={members}
-        itemId={itemId}
-        projectId={projectId}
-        viewer={members.find((m) => m.id === viewerId)}
-      />
+      {viewer ? (
+        <CommentComposer
+          members={members}
+          itemId={itemId}
+          projectId={projectId}
+          viewer={viewer}
+        />
+      ) : (
+        <GuestComposerHint />
+      )}
+    </div>
+  );
+}
+
+/** Visitante sin sesión: el hilo se lee, la conversación pide entrar. */
+function GuestComposerHint() {
+  return (
+    <div className="flex items-center gap-2 rounded-[var(--r-md)] border border-line bg-surface-2 px-3 py-2.5 text-xs text-ink-3">
+      <Link href="/login" className="font-medium text-accent-ink hover:underline">
+        Ingresá
+      </Link>
+      para participar de la conversación.
     </div>
   );
 }
 
 function Comment({
-  slug,
   comment,
   members,
   canDelete,
 }: {
-  slug: string;
   comment: CommentData;
   members: PersonLike[];
   canDelete: boolean;
@@ -108,7 +121,7 @@ function Comment({
             aria-label="Borrar comentario"
             onClick={() =>
               startTransition(async () => {
-                const result = await deleteComment(slug, comment.id);
+                const result = await deleteComment(comment.id);
                 if (!result.ok) toast.error(result.error);
                 else router.refresh();
               })
@@ -154,14 +167,12 @@ function Mentions({ text, members }: { text: string; members: PersonLike[] }) {
 }
 
 export function CommentComposer({
-  slug,
   members,
   itemId,
   projectId,
   viewer,
   placeholder = "Escribí un comentario… usá @ para mencionar",
 }: {
-  slug: string;
   members: PersonLike[];
   itemId?: string;
   projectId?: string;
@@ -203,7 +214,7 @@ export function CommentComposer({
     if (!body || pending) return;
 
     setPending(true);
-    const result = await addComment(slug, { body, itemId, projectId, attachmentIds: [] });
+    const result = await addComment({ body, itemId, projectId, attachmentIds: [] });
     setPending(false);
 
     if (!result.ok) {

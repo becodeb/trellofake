@@ -24,8 +24,7 @@ import { Tooltip } from "@/components/ui/overlays";
 import type { ProjectNode } from "@/server/domain/projects";
 
 export type SidebarProps = {
-  slug: string;
-  workspaceName: string;
+  teamName: string;
   projects: ProjectNode[];
   unread: number;
   myOpenTasks: number;
@@ -37,8 +36,7 @@ export type SidebarProps = {
 };
 
 export function Sidebar({
-  slug,
-  workspaceName,
+  teamName,
   projects,
   unread,
   myOpenTasks,
@@ -49,29 +47,28 @@ export function Sidebar({
   onNavigate,
 }: SidebarProps) {
   const pathname = usePathname();
-  const base = `/w/${slug}`;
 
   const links = [
-    { href: base, label: "Inicio", icon: Compass, exact: true },
-    { href: `${base}/novedades`, label: "Novedades", icon: Inbox, badge: unread },
+    { href: "/", label: "Inicio", icon: Compass, exact: true },
+    { href: "/novedades", label: "Novedades", icon: Inbox, badge: unread },
     ...(canWork
-      ? [{ href: `${base}/mi-trabajo`, label: "Mi trabajo", icon: ListChecks, count: myOpenTasks }]
+      ? [{ href: "/mi-trabajo", label: "Mi trabajo", icon: ListChecks, count: myOpenTasks }]
       : []),
-    { href: `${base}/proyectos`, label: "Proyectos", icon: LayoutGrid },
-    { href: `${base}/ideas`, label: "Ideas propuestas", icon: Lightbulb },
-    { href: `${base}/recursos`, label: "Recursos compartidos", icon: Library },
+    { href: "/proyectos", label: "Proyectos", icon: LayoutGrid },
+    { href: "/ideas", label: "Ideas propuestas", icon: Lightbulb },
+    { href: "/recursos", label: "Recursos compartidos", icon: Library },
   ];
 
   return (
     <div className="flex h-full flex-col gap-1 px-2.5 pb-3 pt-3">
       <div className="flex items-center justify-between px-1.5 pb-2">
-        <Link href={base} onClick={onNavigate} className="min-w-0">
+        <Link href="/" onClick={onNavigate} className="min-w-0">
           <Wordmark size="sm" />
         </Link>
       </div>
 
-      <div className="px-1 pb-1 text-2xs font-medium uppercase tracking-[0.08em] text-ink-4 truncate">
-        {workspaceName}
+      <div className="truncate px-1 pb-1 text-2xs font-medium uppercase tracking-[0.08em] text-ink-4">
+        {teamName}
       </div>
 
       {/* Las dos acciones que se usan cien veces por día viven arriba de todo. */}
@@ -134,7 +131,6 @@ export function Sidebar({
               <ProjectBranch
                 key={project.id}
                 node={project}
-                slug={slug}
                 depth={0}
                 pathname={pathname}
                 onNavigate={onNavigate}
@@ -146,18 +142,18 @@ export function Sidebar({
 
       <div className="mt-2 flex flex-col gap-px border-t border-line-soft pt-2">
         <NavLink
-          href={`${base}/archivo`}
+          href="/archivo"
           icon={<Archive className="size-4" strokeWidth={1.9} />}
-          active={pathname.startsWith(`${base}/archivo`)}
+          active={pathname.startsWith("/archivo")}
           onClick={onNavigate}
         >
           Archivo
         </NavLink>
         {canManage && (
           <NavLink
-            href={`${base}/ajustes`}
+            href="/ajustes"
             icon={<Settings className="size-4" strokeWidth={1.9} />}
-            active={pathname.startsWith(`${base}/ajustes`)}
+            active={pathname.startsWith("/ajustes")}
             onClick={onNavigate}
           >
             Ajustes
@@ -220,18 +216,16 @@ function NavLink({
 /** Rama del árbol de proyectos: se pliega, muestra el color del proyecto. */
 function ProjectBranch({
   node,
-  slug,
   depth,
   pathname,
   onNavigate,
 }: {
   node: ProjectNode;
-  slug: string;
   depth: number;
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const href = `/w/${slug}/p/${node.id}`;
+  const href = `/p/${node.id}`;
   const active = pathname.startsWith(href);
   const hasChildren = node.children.length > 0;
   const [open, setOpen] = React.useState(active || depth === 0);
@@ -295,7 +289,6 @@ function ProjectBranch({
             <ProjectBranch
               key={child.id}
               node={child as ProjectNode}
-              slug={slug}
               depth={depth + 1}
               pathname={pathname}
               onNavigate={onNavigate}

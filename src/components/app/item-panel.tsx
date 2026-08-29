@@ -55,11 +55,9 @@ import { ActivityLine } from "@/components/app/activity";
  * tarea.
  */
 export function ItemPanel({
-  slug,
   members,
   viewerId,
 }: {
-  slug: string;
   members: PersonLike[];
   viewerId: string;
 }) {
@@ -74,10 +72,10 @@ export function ItemPanel({
   const load = React.useCallback(async () => {
     if (!itemId) return;
     setLoading(true);
-    const result = await fetchItem(slug, itemId);
+    const result = await fetchItem(itemId);
     setData(result?.item ?? null);
     setLoading(false);
-  }, [itemId, slug]);
+  }, [itemId]);
 
   React.useEffect(() => {
     if (!itemId) {
@@ -115,7 +113,6 @@ export function ItemPanel({
       ) : data ? (
         <ItemBody
           key={data.id}
-          slug={slug}
           item={data}
           members={members}
           viewerId={viewerId}
@@ -137,14 +134,12 @@ export function ItemPanel({
 }
 
 function ItemBody({
-  slug,
   item,
   members,
   viewerId,
   onClose,
   onChanged,
 }: {
-  slug: string;
   item: ItemData;
   members: PersonLike[];
   viewerId: string;
@@ -167,7 +162,7 @@ function ItemBody({
   }));
 
   const save = async (patch: Record<string, unknown>) => {
-    const result = await updateItem(slug, item.id, patch);
+    const result = await updateItem(item.id, patch);
     if (!result.ok) {
       toast.error(result.error);
       return;
@@ -178,7 +173,7 @@ function ItemBody({
   const loadHistory = async () => {
     setShowHistory((open) => !open);
     if (history.length === 0) {
-      setHistory(await fetchItemActivity(slug, item.id));
+      setHistory(await fetchItemActivity(item.id));
     }
   };
 
@@ -190,7 +185,7 @@ function ItemBody({
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-2xs text-ink-4">
           <Link
-            href={`/w/${slug}/p/${item.project.id}`}
+            href={`/p/${item.project.id}`}
             className="inline-flex min-w-0 items-center gap-1.5 hover:text-ink-2"
           >
             <span
@@ -217,7 +212,7 @@ function ItemBody({
                 variant="ghost"
                 icon
                 onClick={async () => {
-                  const result = await convertToTask(slug, item.id);
+                  const result = await convertToTask(item.id);
                   if (!result.ok) {
                     toast.error(result.error);
                     return;
@@ -233,7 +228,7 @@ function ItemBody({
 
           <Tooltip content="Abrir en el proyecto">
             <Button size="xs" variant="ghost" icon asChild>
-              <Link href={`/w/${slug}/p/${item.project.id}?item=${item.id}`}>
+              <Link href={`/p/${item.project.id}?item=${item.id}`}>
                 <ArrowUpRight className="size-3.5" strokeWidth={1.9} />
               </Link>
             </Button>
@@ -246,7 +241,7 @@ function ItemBody({
               icon
               className="text-ink-4 hover:text-[var(--tone-blocked)]"
               onClick={async () => {
-                const result = await deleteItem(slug, item.id);
+                const result = await deleteItem(item.id);
                 if (!result.ok) {
                   toast.error(result.error);
                   return;
@@ -287,7 +282,7 @@ function ItemBody({
               value={item.status}
               progress={item.progress}
               onChange={async (value) => {
-                const result = await setItemStatus(slug, item.id, value);
+                const result = await setItemStatus(item.id, value);
                 if (!result.ok) toast.error(result.error);
                 else onChanged();
               }}
@@ -300,7 +295,7 @@ function ItemBody({
                   value={assignments}
                   scope={item.assigneeScope as "individual" | "team"}
                   onChange={async (next) => {
-                    const result = await setAssignees(slug, item.id, {
+                    const result = await setAssignees(item.id, {
                       scope: next.scope,
                       assignees: next.assignees,
                     });
@@ -321,7 +316,7 @@ function ItemBody({
                   mode={item.progressMode}
                   hasChildren={item.children.length > 0}
                   onChange={async (progress, mode) => {
-                    const result = await setItemProgress(slug, item.id, progress, mode);
+                    const result = await setItemProgress(item.id, progress, mode);
                     if (!result.ok) toast.error(result.error);
                     else onChanged();
                   }}
@@ -392,10 +387,9 @@ function ItemBody({
           >
             <div className="-mx-1 overflow-hidden rounded-[var(--r-md)] border border-line">
               {item.children.map((child) => (
-                <ItemRow key={child.id} item={child} slug={slug} compact />
+                <ItemRow key={child.id} item={child} compact />
               ))}
               <InlineComposer
-                slug={slug}
                 projectId={item.projectId}
                 parentId={item.id}
                 placeholder="Agregar subtarea…"
@@ -408,13 +402,11 @@ function ItemBody({
 
         <Section title="Archivos" icon={<Paperclip className="size-3" strokeWidth={2} />}>
           <AttachmentGrid
-            slug={slug}
             attachments={item.attachments}
             viewerId={viewerId}
             className="mb-2"
           />
           <FileDrop
-            slug={slug}
             itemId={item.id}
             projectId={item.projectId}
             compact
@@ -424,7 +416,6 @@ function ItemBody({
 
         <Section title="Conversación" count={item.comments.length}>
           <CommentThread
-            slug={slug}
             itemId={item.id}
             comments={item.comments}
             members={members}
@@ -455,7 +446,6 @@ function ItemBody({
                   <ActivityLine
                     key={event.id}
                     event={event}
-                    slug={slug}
                     currentUserId={viewerId}
                     showProject={false}
                   />

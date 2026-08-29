@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import {
   Check,
   ImagePlus,
-  Eye,
-  LockKeyhole,
   MoreHorizontal,
   Plus,
   RotateCcw,
@@ -19,11 +17,9 @@ import { cn } from "@/lib/cn";
 import {
   PROJECT_STATUSES,
   PROJECT_STATUS_META,
-  PROJECT_VISIBILITY_META,
   accentHex,
   type Priority,
   type ProjectStatus,
-  type ProjectVisibility,
 } from "@/lib/domain";
 import { dueState, longDate, pluralize } from "@/lib/format";
 import {
@@ -64,13 +60,11 @@ import { NewProjectButton } from "@/components/app/new-project";
  * estado más, no una acción escondida en un menú de peligro.
  */
 export function ProjectHeader({
-  slug,
   project,
   members,
   canManage,
   canWrite,
 }: {
-  slug: string;
   project: ProjectDetail;
   members: PersonLike[];
   canManage: boolean;
@@ -91,13 +85,13 @@ export function ProjectHeader({
   const rollup = project.subtreeRollup;
 
   const save = async (patch: Record<string, unknown>) => {
-    const result = await updateProject(slug, project.id, patch);
+    const result = await updateProject(project.id, patch);
     if (!result.ok) toast.error(result.error);
     else router.refresh();
   };
 
   const changeStatus = async (next: ProjectStatus) => {
-    const result = await setProjectStatus(slug, project.id, next);
+    const result = await setProjectStatus(project.id, next);
     if (!result.ok) {
       toast.error(result.error);
       return;
@@ -113,7 +107,7 @@ export function ProjectHeader({
     if (!file) return;
     const data = new FormData();
     data.set("file", file);
-    const result = await uploadCover(slug, project.id, data);
+    const result = await uploadCover(project.id, data);
     if (!result.ok) toast.error(result.error);
     else {
       toast.success("Portada actualizada");
@@ -165,14 +159,6 @@ export function ProjectHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="inline-flex items-center gap-1.5 px-2 text-2xs text-ink-4">
-            {project.visibility === "community" ? (
-              <Eye className="size-3" strokeWidth={2} />
-            ) : (
-              <LockKeyhole className="size-3" strokeWidth={2} />
-            )}
-            {project.visibility === "community" ? "Comunidad" : "Solo equipo"}
-          </span>
           <StatusMenu
             status={project.status}
             archived={Boolean(project.archivedAt)}
@@ -195,34 +181,9 @@ export function ProjectHeader({
               )}
 
               {canManage && (
-                <>
-                  <MenuSeparator />
-                  <MenuLabel>Quién puede verlo</MenuLabel>
-                  {(["community", "team"] as ProjectVisibility[]).map((visibility) => (
-                    <MenuItem
-                      key={visibility}
-                      onSelect={() => save({ visibility })}
-                    >
-                      {visibility === "community" ? (
-                        <Eye className="size-3.5" strokeWidth={1.9} />
-                      ) : (
-                        <LockKeyhole className="size-3.5" strokeWidth={1.9} />
-                      )}
-                      <span className="flex-1">
-                        {PROJECT_VISIBILITY_META[visibility].label}
-                      </span>
-                      {project.visibility === visibility && (
-                        <Check className="size-3.5 text-accent" strokeWidth={2.4} />
-                      )}
-                    </MenuItem>
-                  ))}
-                </>
-              )}
-
-              {project.archivedAt && canManage && (
                 <MenuItem
                   onSelect={async () => {
-                    const result = await restoreProject(slug, project.id);
+                    const result = await restoreProject(project.id);
                     if (!result.ok) toast.error(result.error);
                     else {
                       toast.success("Proyecto retomado");
@@ -242,13 +203,13 @@ export function ProjectHeader({
                   <MenuItem
                     destructive
                     onSelect={async () => {
-                      const result = await deleteProject(slug, project.id);
+                      const result = await deleteProject(project.id);
                       if (!result.ok) {
                         toast.error(result.error);
                         return;
                       }
                       toast.success("Proyecto borrado");
-                      router.push(`/w/${slug}/proyectos`);
+                      router.push(`/proyectos`);
                       router.refresh();
                     }}
                   >
@@ -272,7 +233,7 @@ export function ProjectHeader({
               mode={project.progressMode}
               hasChildren={project.children.length > 0 || rollup.total > 0}
               onChange={async (progress, mode) => {
-                const result = await setProjectProgress(slug, project.id, progress, mode);
+                const result = await setProjectProgress(project.id, progress, mode);
                 if (!result.ok) toast.error(result.error);
                 else router.refresh();
               }}
@@ -340,7 +301,6 @@ export function ProjectHeader({
         <Divider />
 
         <MemberEditor
-          slug={slug}
           projectId={project.id}
           all={members}
           current={project.members.map((m) => m.user)}
@@ -350,7 +310,6 @@ export function ProjectHeader({
         {canWrite && (
           <div className="ml-auto">
             <NewProjectButton
-              slug={slug}
               members={members}
               parents={[]}
               defaultParentId={project.id}
@@ -454,13 +413,13 @@ function StatusMenu({
 }
 
 function MemberEditor({
-  slug,
+  
   projectId,
   all,
   current,
   disabled,
 }: {
-  slug: string;
+  
   projectId: string;
   all: PersonLike[];
   current: PersonLike[];
@@ -475,7 +434,7 @@ function MemberEditor({
       ? current.filter((p) => p.id !== userId).map((p) => p.id)
       : [...current.map((p) => p.id), userId];
 
-    const result = await setProjectMembers(slug, projectId, next);
+    const result = await setProjectMembers(projectId, next);
     if (!result.ok) toast.error(result.error);
     else router.refresh();
   };

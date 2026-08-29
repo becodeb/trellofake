@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { markRead } from "@/server/actions/workspace";
+import { markRead } from "@/server/actions/team";
 import type { ActivityEvent } from "@/lib/shared";
 import { ActivityLine } from "@/components/app/activity";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,12 @@ import { Button } from "@/components/ui/button";
  * ya no hay nada nuevo, en vez de quedar ocupando lugar con un cero.
  */
 export function NewsStrip({
-  slug,
   events,
   unread,
   direct,
   currentUserId,
   className,
 }: {
-  slug: string;
   events: ActivityEvent[];
   unread: number;
   direct: number;
@@ -42,7 +40,7 @@ export function NewsStrip({
   const markAll = () => {
     setDismissed(true);
     startTransition(async () => {
-      await markRead(slug);
+      await markRead();
       router.refresh();
     });
   };
@@ -82,7 +80,6 @@ export function NewsStrip({
           <ActivityLine
             key={event.id}
             event={event}
-            slug={slug}
             currentUserId={currentUserId}
           />
         ))}
@@ -90,7 +87,7 @@ export function NewsStrip({
 
       {unread > events.length && (
         <Link
-          href={`/w/${slug}/novedades`}
+          href={"/novedades"}
           className="flex items-center gap-1.5 border-t border-accent-line/70 px-4 py-2 text-xs font-medium text-accent-ink transition-colors hover:bg-accent-line/25"
         >
           Ver las {unread} novedades

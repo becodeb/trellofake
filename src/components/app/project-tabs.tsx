@@ -7,18 +7,16 @@ import { cn } from "@/lib/cn";
 
 /** Pestañas del proyecto. El número al lado dice si vale la pena entrar. */
 export function ProjectTabs({
-  slug,
   projectId,
   counts,
   canWork,
 }: {
-  slug: string;
   projectId: string;
   counts: { tasks: number; children: number; files: number };
   canWork: boolean;
 }) {
   const pathname = usePathname();
-  const base = `/w/${slug}/p/${projectId}`;
+  const base = `/p/${projectId}`;
 
   const tabs = [
     { href: base, label: "Resumen", exact: true },

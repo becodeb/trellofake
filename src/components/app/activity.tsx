@@ -51,15 +51,13 @@ function parseMeta(meta: string | null): Record<string, unknown> {
 
 function Target({
   event,
-  slug,
 }: {
   event: ActivityEvent;
-  slug: string;
 }) {
   if (event.targetType === "proposal" || event.targetType === "resource") {
     return (
       <Link
-        href={`/w/${slug}/${event.targetType === "proposal" ? "ideas" : "recursos"}`}
+        href={`/${event.targetType === "proposal" ? "ideas" : "recursos"}`}
         className="font-medium text-ink decoration-line-strong underline-offset-2 hover:underline"
       >
         {event.targetLabel}
@@ -70,8 +68,8 @@ function Target({
   if (!projectId) return <Strong>{event.targetLabel}</Strong>;
 
   const href = event.item
-    ? `/w/${slug}/p/${projectId}?item=${event.item.id}`
-    : `/w/${slug}/p/${projectId}`;
+    ? `/p/${projectId}?item=${event.item.id}`
+    : `/p/${projectId}`;
 
   return (
     <Link
@@ -90,11 +88,10 @@ function Strong({ children }: { children: React.ReactNode }) {
 /** Traduce un evento a la frase que lo describe. */
 export function describe(
   event: ActivityEvent,
-  slug: string,
   currentUserId: string,
 ): React.ReactNode {
   const meta = parseMeta(event.meta);
-  const target = <Target event={event} slug={slug} />;
+  const target = <Target event={event} />;
   const itemType = (event.item?.type ?? (meta.type as string) ?? "task") as ItemType;
   const article = ARTICLE[itemType] ?? "el elemento";
   const mine = event.actor.id === currentUserId;
@@ -336,13 +333,11 @@ function projectStatusLabel(status: string) {
 
 export function ActivityLine({
   event,
-  slug,
   currentUserId,
   showProject = true,
   showTime = "relative",
 }: {
   event: ActivityEvent;
-  slug: string;
   currentUserId: string;
   showProject?: boolean;
   showTime?: "relative" | "clock";
@@ -368,7 +363,7 @@ export function ActivityLine({
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-snug text-ink-2">
           <span className="font-medium text-ink">{event.actor.name.split(" ")[0]}</span>{" "}
-          {describe(event, slug, currentUserId)}
+          {describe(event, currentUserId)}
         </p>
 
         {isComment && excerpt && (
@@ -383,7 +378,7 @@ export function ActivityLine({
             <>
               <span className="opacity-50">·</span>
               <Link
-                href={`/w/${slug}/p/${event.project.id}`}
+                href={`/p/${event.project.id}`}
                 className="inline-flex items-center gap-1 hover:text-ink-2"
               >
                 <span
@@ -410,13 +405,11 @@ export function ActivityLine({
 
 export function ActivityTimeline({
   events,
-  slug,
   currentUserId,
   showProject = true,
   className,
 }: {
   events: ActivityEvent[];
-  slug: string;
   currentUserId: string;
   showProject?: boolean;
   className?: string;
@@ -433,7 +426,6 @@ export function ActivityTimeline({
               <ActivityLine
                 key={event.id}
                 event={event}
-                slug={slug}
                 currentUserId={currentUserId}
                 showProject={showProject}
                 showTime="clock"

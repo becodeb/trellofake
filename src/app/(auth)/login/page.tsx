@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/server/auth/session";
-import { defaultWorkspaceSlug } from "@/server/auth/context";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Entrar" };
@@ -13,10 +12,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const user = await getCurrentUser();
-  if (user) {
-    const slug = await defaultWorkspaceSlug(user.id);
-    redirect(slug ? `/w/${slug}` : "/");
-  }
+  if (user) redirect("/");
 
   const { next } = await searchParams;
 
@@ -32,12 +28,12 @@ export default async function LoginPage({
       </div>
 
       <p className="mt-6 text-xs text-ink-3">
-        ¿Todavía no tenés equipo?{" "}
+        ¿Todavía no tenés cuenta?{" "}
         <Link
           href="/signup"
           className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent"
         >
-          Creá uno
+          Creá una
         </Link>
       </p>
     </div>

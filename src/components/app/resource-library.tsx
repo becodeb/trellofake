@@ -22,7 +22,6 @@ import {
 import {
   RESOURCE_KINDS,
   RESOURCE_KIND_LABEL,
-  type ProjectVisibility,
   type ResourceKind,
 } from "@/lib/domain";
 import { createResource, deleteResource } from "@/server/actions/resources";
@@ -40,7 +39,6 @@ export type KnowledgeResourceData = {
   markdown: string | null;
   markdownUrl: string | null;
   resolvedMarkdown: string | null;
-  visibility: string;
   project: { id: string; name: string } | null;
   addedBy: { name: string };
 };
@@ -48,13 +46,11 @@ export type KnowledgeResourceData = {
 type ProjectOption = { id: string; name: string };
 
 export function ResourceLibrary({
-  slug,
   resources,
   projects,
   canManage,
   defaultProjectId,
 }: {
-  slug: string;
   resources: KnowledgeResourceData[];
   projects: ProjectOption[];
   canManage: boolean;
@@ -87,7 +83,6 @@ export function ResourceLibrary({
           {resources.map((resource) => (
             <ResourceCard
               key={resource.id}
-              slug={slug}
               resource={resource}
               canManage={canManage}
             />
@@ -96,7 +91,6 @@ export function ResourceLibrary({
       )}
 
       <ResourceDialog
-        slug={slug}
         projects={projects}
         defaultProjectId={defaultProjectId}
         open={creating}
@@ -107,11 +101,9 @@ export function ResourceLibrary({
 }
 
 function ResourceCard({
-  slug,
   resource,
   canManage,
 }: {
-  slug: string;
   resource: KnowledgeResourceData;
   canManage: boolean;
 }) {
@@ -132,15 +124,11 @@ function ResourceCard({
             <span className="text-2xs text-ink-4">
               {RESOURCE_KIND_LABEL[resource.kind as ResourceKind] ?? resource.kind}
             </span>
-            <span className="text-2xs text-ink-4">·</span>
-            <span className="text-2xs text-ink-4">
-              {resource.visibility === "team" ? "Solo equipo" : "Comunidad"}
-            </span>
           </div>
           {resource.summary && <p className="mt-1 text-sm leading-relaxed text-ink-3">{resource.summary}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
             {resource.project && (
-              <Link href={`/w/${slug}/p/${resource.project.id}`} className="text-accent-ink hover:underline">
+              <Link href={`/p/${resource.project.id}`} className="text-accent-ink hover:underline">
                 {resource.project.name}
               </Link>
             )}
@@ -161,7 +149,7 @@ function ResourceCard({
             aria-label="Eliminar recurso"
             className="grid size-7 place-items-center rounded-[var(--r-sm)] text-ink-4 transition-colors hover:bg-surface-2 hover:text-[var(--tone-blocked)]"
             onClick={async () => {
-              const result = await deleteResource(slug, resource.id);
+              const result = await deleteResource(resource.id);
               if (!result.ok) toast.error(result.error);
               else router.refresh();
             }}
@@ -210,13 +198,11 @@ function ResourceCard({
 }
 
 function ResourceDialog({
-  slug,
   projects,
   defaultProjectId,
   open,
   onOpenChange,
 }: {
-  slug: string;
   projects: ProjectOption[];
   defaultProjectId?: string;
   open: boolean;
@@ -231,7 +217,6 @@ function ResourceDialog({
   const [markdown, setMarkdown] = React.useState("");
   const [markdownUrl, setMarkdownUrl] = React.useState("");
   const [projectId, setProjectId] = React.useState(defaultProjectId ?? "");
-  const [visibility, setVisibility] = React.useState<ProjectVisibility>("community");
   const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
@@ -244,12 +229,11 @@ function ResourceDialog({
     setMarkdown("");
     setMarkdownUrl("");
     setProjectId(defaultProjectId ?? "");
-    setVisibility("community");
   }, [open, defaultProjectId]);
 
   const submit = async () => {
     setPending(true);
-    const result = await createResource(slug, {
+    const result = await createResource({
       name,
       summary,
       kind,
@@ -258,7 +242,6 @@ function ResourceDialog({
       markdown: markdown || undefined,
       markdownUrl: markdownUrl || undefined,
       projectId: projectId || undefined,
-      visibility,
     });
     setPending(false);
     if (!result.ok) toast.error(result.error);
@@ -293,20 +276,12 @@ function ResourceDialog({
               <Field label="O pegá el Markdown"><AutoTextarea value={markdown} onChange={(event) => setMarkdown(event.target.value)} minRows={6} placeholder={"# Consumir la API\n\n```http\nGET /api/tickets\n```"} /></Field>
             </div>
           )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Proyecto" hint="Vacío = recurso de toda la red.">
-              <select value={projectId} disabled={Boolean(defaultProjectId)} onChange={(event) => setProjectId(event.target.value)} className="h-8.5 w-full rounded-[var(--r-md)] border border-line bg-surface px-2.5 text-sm disabled:opacity-60">
-                <option value="">Toda la red</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Visibilidad">
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as ProjectVisibility)} className="h-8.5 w-full rounded-[var(--r-md)] border border-line bg-surface px-2.5 text-sm">
-                <option value="community">Comunidad</option>
-                <option value="team">Solo equipo</option>
-              </select>
-            </Field>
-          </div>
+          <Field label="Proyecto" hint="Vacío = recurso de toda la red.">
+            <select value={projectId} disabled={Boolean(defaultProjectId)} onChange={(event) => setProjectId(event.target.value)} className="h-8.5 w-full rounded-[var(--r-md)] border border-line bg-surface px-2.5 text-sm disabled:opacity-60">
+              <option value="">Toda la red</option>
+              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </select>
+          </Field>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>

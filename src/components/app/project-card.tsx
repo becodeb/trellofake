@@ -19,11 +19,9 @@ import type { ProjectCard as ProjectCardData } from "@/server/domain/projects";
  */
 export function ProjectCard({
   project,
-  slug,
   className,
 }: {
   project: ProjectCardData;
-  slug: string;
   className?: string;
 }) {
   const accent = accentHex(project.accent);
@@ -34,7 +32,7 @@ export function ProjectCard({
 
   return (
     <Link
-      href={`/w/${slug}/p/${project.id}`}
+      href={`/p/${project.id}`}
       className={cn(
         "group flex flex-col overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface",
         "transition-[border-color,box-shadow,transform] duration-150",
@@ -166,11 +164,9 @@ function Cover({
 /** Fila compacta: para listas largas y para subproyectos. */
 export function ProjectRow({
   project,
-  slug,
   depth = 0,
 }: {
   project: ProjectCardData;
-  slug: string;
   depth?: number;
 }) {
   const status = PROJECT_STATUS_META[project.status as ProjectStatus];
@@ -179,7 +175,7 @@ export function ProjectRow({
 
   return (
     <Link
-      href={`/w/${slug}/p/${project.id}`}
+      href={`/p/${project.id}`}
       className="row hairline flex items-center gap-3 px-3 py-2.5"
       style={{ paddingLeft: 12 + depth * 18 }}
     >
