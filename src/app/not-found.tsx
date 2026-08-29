@@ -24,8 +24,7 @@ export default function NotFound() {
         <div className="max-w-sm animate-rise">
           <h1 className="font-display text-3xl leading-none text-ink">Por acá no hay nada</h1>
           <p className="mt-2.5 text-sm leading-relaxed text-ink-3">
-            La página no existe, o el proyecto que buscabas está en otro equipo del que no
-            formás parte.
+            La página no existe, o el proyecto que buscabas ya no está.
           </p>
           <Button variant="primary" size="lg" className="mt-6" asChild>
             <Link href="/">Volver al inicio</Link>

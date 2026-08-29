@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
-import { getCurrentUser } from "@/server/auth/session";
 import { get } from "@/server/storage";
 
 /**
  * Sirve los archivos subidos.
  *
- * No alcanza con adivinar la ruta: se verifica que quien pide el archivo sea
- * miembro del workspace dueño. Un adjunto de un equipo no se filtra por tener
- * la URL.
+ * El contenido es público: no se pide sesión ni membresía. Solo se resuelve la
+ * clave contra la tabla de adjuntos para conocer nombre y tipo — si la clave
+ * no corresponde a un adjunto, 404. Se sirve con `Cache-Control: public`
+ * porque la URL es inmutable (`<teamId>/<hash>`).
  */
 export async function GET(
   _request: Request,
@@ -18,14 +18,8 @@ export async function GET(
   const { path } = await params;
   const key = path.join("/");
 
-  const user = await getCurrentUser();
-  if (!user) return new NextResponse("No autorizado", { status: 401 });
-
   const attachment = await db.attachment.findFirst({
-    where: {
-      storageKey: key,
-      workspace: { members: { some: { userId: user.id } } },
-    },
+    where: { storageKey: key },
     select: { filename: true, mimeType: true },
   });
 
@@ -43,7 +37,7 @@ export async function GET(
         "Content-Type": attachment.mimeType,
         "Content-Length": String(file.size),
         "Content-Disposition": `${inlineSafe ? "inline" : "attachment"}; filename="${encodeURIComponent(attachment.filename)}"`,
-        "Cache-Control": "private, max-age=31536000, immutable",
+        "Cache-Control": "public, max-age=31536000, immutable",
         // Aunque el archivo llegue a ejecutarse, no puede pedir nada ni salir.
         "Content-Security-Policy": "default-src 'none'; sandbox",
         "X-Content-Type-Options": "nosniff",

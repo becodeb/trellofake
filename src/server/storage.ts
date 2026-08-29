@@ -42,15 +42,15 @@ export type StoredFile = {
 };
 
 export async function put(
-  workspaceId: string,
   file: File,
+  teamId: string,
 ): Promise<StoredFile> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error("El archivo supera los 10 MB.");
   }
 
   const id = randomBytes(12).toString("hex");
-  const key = `${workspaceId}/${id}${safeExtension(file.name)}`;
+  const key = `${teamId}/${id}${safeExtension(file.name)}`;
   const target = path.join(ROOT, key);
 
   await mkdir(path.dirname(target), { recursive: true });
