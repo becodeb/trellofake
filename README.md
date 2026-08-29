@@ -161,3 +161,77 @@ npm run typecheck    # tipos sin emitir
 npm run db:reset     # vaciar y volver a sembrar
 npm run db:studio    # explorar la base
 ```
+
+---
+
+## Conectar una IA (MCP)
+
+Hilo expone un servidor [MCP](https://modelcontextprotocol.io) (Streamable HTTP) en
+`/api/mcp` para que cualquier IA —Claude, Cursor, opencode, etc.— pueda leer lo que el
+equipo subió: proyectos, tareas, ideas, notas, problemas, decisiones, propuestas,
+recursos y guías de integración. El acceso es de solo lectura y queda acotado al
+workspace del token: la IA ve exactamente lo que vería un miembro con ese rol.
+
+### 1. Crear un token
+
+1. Entrá como admin y andá a **Ajustes → Acceso por API**.
+2. Elegí la expiración y creá el token: se muestra **una sola vez**, guardalo.
+3. La misma sección muestra la URL del endpoint.
+
+Los tokens se guardan en la base como hash, vencen solos y se revocan en cualquier
+momento desde la misma sección.
+
+### 2. Conectar un cliente
+
+**opencode** (`~/.config/opencode/opencode.json` o el `opencode.json` del proyecto):
+
+```json
+{
+  "mcp": {
+    "hilo": {
+      "type": "remote",
+      "url": "https://<tu-hilo>/api/mcp",
+      "headers": { "Authorization": "Bearer {env:HILO_TOKEN}" },
+      "enabled": true
+    }
+  }
+}
+```
+
+Exportá el token y reiniciá opencode: `export HILO_TOKEN="<token>"`.
+
+**Claude Code**:
+
+```bash
+claude mcp add --transport http hilo https://<tu-hilo>/api/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+Verificá con `claude mcp list` (debería decir `✔ Connected`). También se puede
+configurar en un `.mcp.json` en la raíz del proyecto.
+
+**Claude Desktop**: agregá el servidor en `claude_desktop_config.json` (en
+`~/Library/Application Support/Claude/` en macOS, `%APPDATA%\Claude\` en Windows o
+`~/.config/Claude/` en Linux) con `type: "http"`, la URL y el header `Authorization`.
+
+### 3. Qué puede hacer la IA
+
+| Tool | Qué lee |
+|---|---|
+| `hilo_list_projects` / `hilo_get_project` | proyectos y subproyectos |
+| `hilo_list_items` / `hilo_get_item` | tareas, ideas, notas, problemas, decisiones y avances (con filtros) |
+| `hilo_list_proposals` | propuestas del buzón con sus conversaciones |
+| `hilo_list_resources` | biblioteca de recursos y guías de integración |
+| `hilo_list_people` | quiénes son del equipo y qué hacen |
+| `hilo_get_feed` | actividad reciente del workspace |
+| `hilo_search` | búsqueda global |
+
+El servidor respeta la visibilidad de cada proyecto (comunidad o solo equipo) según el
+rol del token y aísla los datos por workspace.
+
+### 4. Límites y seguridad
+
+- Solo lectura: ninguna tool muta datos.
+- 120 pedidos por minuto por token.
+- El token equivale a una contraseña del workspace: mantenelo fuera de repositorios y
+  revocá cualquier token que se filtre.
