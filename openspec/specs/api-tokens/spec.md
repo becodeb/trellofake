@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Workspace API tokens let AI clients (MCP) authenticate as a member of one workspace. Tokens are stored hashed, expire, and can be created and revoked from workspace settings.
+API tokens let AI clients (MCP) authenticate as a member of the singleton team. Tokens are stored hashed, expire, and can be created and revoked from the team settings page.
 
 ## Requirements
 
 ### Requirement: ApiToken persistence model
 
-The system MUST add an `ApiToken` model to the Prisma schema storing: `id` (sha256 hash of the raw token, following the `Session` pattern), `workspaceId`, `userId`, `expiresAt`, `revoked` (Boolean, default false), and `createdAt`. The raw token MUST NOT be persisted anywhere. Tokens MUST be looked up by their sha256 hash.
+The system MUST add an `ApiToken` model to the Prisma schema storing: `id` (sha256 hash of the raw token, following the `Session` pattern), `userId`, `expiresAt`, `revoked` (Boolean, default false), and `createdAt`. The model MUST NOT store `workspaceId` or `teamId`: every token resolves to the singleton team by construction. The raw token MUST NOT be persisted anywhere. Tokens MUST be looked up by their sha256 hash.
 
 #### Scenario: Only the hash is stored
 
@@ -21,6 +21,12 @@ The system MUST add an `ApiToken` model to the Prisma schema storing: `id` (sha2
 - GIVEN a token whose `expiresAt` is in the past
 - WHEN a request authenticates with it at `/api/mcp`
 - THEN the request is rejected with HTTP 401
+
+#### Scenario: Existing token stays valid through the migration
+
+- GIVEN a token created before the single-team migration
+- WHEN migration `0001_single_team` applies and a request authenticates with it
+- THEN the token still authenticates without reissue
 
 ### Requirement: Capability-gated token management
 
@@ -70,7 +76,7 @@ The system MUST provide a revoke-token Server Action gated by `api-tokens.revoke
 
 ### Requirement: Token management UI
 
-The workspace settings page `src/app/w/[slug]/ajustes/page.tsx` MUST include an "Acceso por API" section that lists existing tokens (masked hash, expiry, revoked state) with a revoke control per row, offers token creation with an expiry choice, and after creation shows the raw token exactly once — in a copyable box together with the MCP endpoint URL. Subsequent renders MUST show only the masked hash.
+The settings page at the clean route `/ajustes` MUST include an "Acceso por API" section that lists existing tokens (masked hash, expiry, revoked state) with a revoke control per row, offers token creation with an expiry choice, and after creation shows the raw token exactly once — in a copyable box together with the MCP endpoint URL. Subsequent renders MUST show only the masked hash.
 
 #### Scenario: Raw token shown exactly once
 

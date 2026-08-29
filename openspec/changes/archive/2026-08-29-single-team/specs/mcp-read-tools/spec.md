@@ -1,14 +1,11 @@
-# MCP Read Tools Specification
+# Delta for MCP Read Tools
 
-## Purpose
-
-Read-only MCP tools (`hilo_*`) exposing team content to AI clients. Every tool is hard-scoped to the singleton team and is not subject to per-role visibility filtering.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Tool coverage
 
 The system MUST expose `hilo_*` read tools covering: projects with their subproject tree; items of all six `ItemType` (`task`, `idea`, `note`, `problem`, `decision`, `update`) with filters; proposals with their replies; knowledge resources with their access/integration guides; people; team feed/activity; and search.
+(Previously: coverage mentioned "workspace feed/activity" — the feed is now global to the singleton team.)
 
 #### Scenario: tools/list enumerates the read tools
 
@@ -31,6 +28,7 @@ The system MUST expose `hilo_*` read tools covering: projects with their subproj
 ### Requirement: Team scoping
 
 Each tool MUST resolve all queries against the singleton team without `workspaceId` scoping. Tools MUST NOT filter by workspace, and identifiers always reference the single team's data.
+(Previously: each query hard-scoped to the token's workspaceId; identifiers from other workspaces yielded no data.)
 
 #### Scenario: Identifiers resolve within the team
 
@@ -42,6 +40,7 @@ Each tool MUST resolve all queries against the singleton team without `workspace
 ### Requirement: Input validation
 
 Each tool MUST validate its arguments with Zod against the vocabulary in `src/lib/domain.ts` (`isItemType`, `isValidStatus`, `PROPOSAL_STATUSES`, `RESOURCE_KINDS`, `PRIORITIES`, search kinds). Invalid or unknown filter values MUST produce a JSON-RPC invalid-params error rather than empty results.
+(Previously: the validated vocabulary included `PROJECT_VISIBILITIES`, which is removed with the visibility columns.)
 
 #### Scenario: Invalid item type filter
 
@@ -50,13 +49,9 @@ Each tool MUST validate its arguments with Zod against the vocabulary in `src/li
 - THEN the call fails with invalid-params
 - AND no query is executed
 
-### Requirement: Read-only execution
+## REMOVED Requirements
 
-Tools MUST be implemented exclusively over existing read paths (`src/server/domain/*`) and MUST NOT invoke Server Actions or write paths. No tool call MAY create, update, or delete data or emit activity events.
+### Requirement: Visibility enforcement
 
-#### Scenario: Read path only
-
-- GIVEN an authenticated session
-- WHEN any tool executes
-- THEN only read functions are used
-- AND no rows change
+(Reason: `Project.visibility` and `KnowledgeResource.visibility` columns are dropped — all content is public in the single-team instance. The `projectAccess` viewer branch and `visibleProjectIds` post-filters are removed from all four sites together.)
+(Migration: `community`, `developer`, and `admin` tokens now receive identical, unfiltered results; MCP clients relying on visibility filtering must drop those assumptions.)
