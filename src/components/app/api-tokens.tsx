@@ -5,14 +5,23 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Ban, Check, Copy, KeyRound, Plus } from "lucide-react";
 
-import {
-  API_TOKEN_EXPIRY_OPTIONS,
-  createApiTokenAction,
-  revokeApiToken,
-} from "@/server/actions/tokens";
+import { createApiTokenAction, revokeApiToken } from "@/server/actions/tokens";
 import { shortDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+
+/**
+ * Opciones de expiración de la UI. Viven en el cliente a propósito: un módulo
+ * "use server" solo expone acciones a los clientes, los valores constantes no
+ * se transportan y quedan `undefined` en runtime. La acción del servidor
+ * valida cualquier fecha futura por sí sola.
+ */
+const EXPIRY_OPTIONS = [
+  { days: 30, label: "30 días" },
+  { days: 90, label: "90 días" },
+  { days: 180, label: "6 meses" },
+  { days: 365, label: "1 año" },
+] as const;
 
 export type ApiTokenRow = {
   id: string;
@@ -29,14 +38,18 @@ export type ApiTokenRow = {
  */
 export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[] }) {
   const router = useRouter();
-  const [expiry, setExpiry] = React.useState<string>(API_TOKEN_EXPIRY_OPTIONS[1].label);
+  const [expiry, setExpiry] = React.useState<string>(EXPIRY_OPTIONS[1].label);
   const [pending, setPending] = React.useState(false);
   const [created, setCreated] = React.useState<{ raw: string; expiresAt: string } | null>(null);
+  // `location` no existe durante el render del servidor: la URL del endpoint se
+  // calcula recién en el navegador. El cuadro que la muestra solo aparece tras
+  // crear un token (acción de cliente), así que siempre llega seteada.
+  const [origin, setOrigin] = React.useState("");
+  React.useEffect(() => setOrigin(window.location.origin), []);
 
   const create = async () => {
     if (pending) return;
-    const option =
-      API_TOKEN_EXPIRY_OPTIONS.find((o) => o.label === expiry) ?? API_TOKEN_EXPIRY_OPTIONS[0];
+    const option = EXPIRY_OPTIONS.find((o) => o.label === expiry) ?? EXPIRY_OPTIONS[0];
     const expiresAt = new Date(Date.now() + option.days * 86_400_000).toISOString();
 
     setPending(true);
@@ -63,7 +76,7 @@ export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[
     router.refresh();
   };
 
-  const mcpUrl = `${location.origin}/api/mcp`;
+  const mcpUrl = `${origin}/api/mcp`;
 
   return (
     <div className="space-y-4">
@@ -74,7 +87,7 @@ export function ApiTokens({ slug, tokens }: { slug: string; tokens: ApiTokenRow[
         >
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">
-              {API_TOKEN_EXPIRY_OPTIONS.map((option) => (
+              {EXPIRY_OPTIONS.map((option) => (
                 <button
                   key={option.label}
                   type="button"

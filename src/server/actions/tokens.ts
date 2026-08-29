@@ -7,16 +7,6 @@ import { requireWorkspaceAction } from "@/server/auth/context";
 import { createApiToken } from "@/server/auth/token";
 import { ok, run, revalidateWorkspace, type ActionResult } from "@/server/actions/shared";
 
-const EXPIRY_OPTIONS = [
-  { days: 30, label: "30 días" },
-  { days: 90, label: "90 días" },
-  { days: 180, label: "6 meses" },
-  { days: 365, label: "1 año" },
-] as const;
-
-/** Opciones de expiración que ofrece la UI. La acción acepta cualquier fecha futura. */
-export const API_TOKEN_EXPIRY_OPTIONS = EXPIRY_OPTIONS;
-
 const createSchema = z.object({
   expiresAt: z.coerce
     .date({ error: "La fecha de expiración es obligatoria." })
