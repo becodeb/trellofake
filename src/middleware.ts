@@ -12,7 +12,7 @@ const TEAM_SLUG = process.env.TEAM_SLUG ?? "hilo";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const segments = pathname.split("/").filter(Boolean); // ["w", slug, ...rest]
+  const segments = pathname.split("/").filter(Boolean);
 
   const slug = segments[1];
   if (slug !== TEAM_SLUG) {

@@ -5,9 +5,10 @@ aplicaciones.
 
 Hilo combina dos experiencias en el mismo lugar: quienes desarrollan conservan
 la gestión de proyectos, tareas, responsables, problemas y decisiones; quienes
-no trabajan con el código pueden seguir los proyectos publicados, conversar con
-el equipo y proponer necesidades. La intención es que nadie pierda el contexto
-ni tenga que encontrar a la persona correcta por otro canal.
+no trabajan con el código pueden seguir todo lo que se construye (el contenido
+es público), conversar con el equipo y proponer necesidades. La intención es que
+nadie pierda el contexto ni tenga que encontrar a la persona correcta por otro
+canal.
 
 ---
 
@@ -25,8 +26,8 @@ npm run setup
 npm run dev
 ```
 
-`setup` genera el cliente de Prisma, crea la base SQLite y carga datos de
-ejemplo. Después, entrar en <http://localhost:3000/login>:
+`setup` genera el cliente de Prisma, aplica las migraciones (`migrate deploy`)
+y carga datos de ejemplo. Después, entrar en <http://localhost:3000/login>:
 
 | Cuenta | Contraseña | Rol |
 |---|---|---|
@@ -44,6 +45,14 @@ Para volver a empezar de cero: `npm run db:reset`.
 ---
 
 ## Decisiones de arquitectura
+
+**Una instancia = un equipo.** No hay multi-tenancy: la base guarda un único
+`Team` cuyo id es el del workspace histórico, así las claves de storage
+(`<teamId>/<hash>`) y los tokens de API conservan su valor sin migrar datos. La
+membresía es global (`Membership @@unique([userId])`) y el contenido es
+público: la lectura no pide sesión y la escritura se gobierna por capacidades
+(`can()`). El alta de la primera cuenta queda como admin; las siguientes
+entran como comunidad.
 
 **Un `Item` para los seis tipos de contenido.** Tarea, idea, nota, problema,
 decisión y actualización comparten tabla. Todas necesitan lo mismo —autor,
@@ -73,10 +82,10 @@ estado, un rol o un tipo de contenido se hace en `src/lib/domain.ts` y se
 propaga solo, sin migración. También mantiene el esquema portable: cambiar
 SQLite por PostgreSQL es cambiar dos líneas de `schema.prisma`.
 
-**Dos superficies, un solo producto.** `admin` y `developer` gestionan trabajo;
-`community` participa. Cada proyecto define si lo ve toda la comunidad o solo
-el equipo. El mismo control se aplica al listado, al acceso directo y a las
-acciones del servidor, por lo que una URL conocida no salta la privacidad.
+**Los roles gobiernan las acciones, no la lectura.** `admin` y `developer`
+gestionan trabajo; `community` participa; un visitante sin sesión lee como
+invitado. Toda mutación pasa por `requireTeamAction(capability)` y, si no hay
+sesión, responde `{ ok: false }` con UNAUTHENTICATED en lugar de filtrar datos.
 
 **Las propuestas son una entrada, no otro tablero.** Una necesidad nace en el
 buzón común, acumula conversación y el equipo la vincula a un proyecto o la
@@ -99,7 +108,7 @@ intermedio más adelante no obliga a tocar cada pantalla.
 | Pieza | Elección | Por qué |
 |---|---|---|
 | Framework | Next.js 15 (App Router, Server Actions) | Un solo proceso, datos en el servidor, mutaciones sin API intermedia |
-| Base | Prisma + SQLite | Cero infraestructura en desarrollo; el esquema ya es portable a Postgres |
+| Base | Prisma + SQLite con migraciones | Cero infraestructura en desarrollo; el esquema ya es portable a Postgres |
 | Estilos | Tailwind CSS v4 | Tokens en CSS, sin archivo de configuración |
 | UI | Radix + cmdk + dnd-kit | Accesibilidad y foco resueltos por piezas probadas |
 | Auth | Propia (cookie + tabla de sesiones) | La base guarda el hash del token, no el token |
@@ -107,20 +116,38 @@ intermedio más adelante no obliga a tocar cada pantalla.
 
 ---
 
+## Migraciones y operación
+
+El esquema vive en `prisma/migrations/` (nada de `db push`):
+
+- `0000_baseline`: el esquema anterior, como punto de partida del historial.
+- `0001_single_team`: `Workspace` → `Team` (conservando el id), elimina las 10
+  columnas `workspaceId` y las dos de visibilidad, y vuelve la membresía
+  global. Borra tablas y columnas copiando datos: nunca se usa `--force-reset`.
+
+El entrypoint del contenedor arranca bases nuevas con `migrate deploy` + seed y
+bases existentes marcando el baseline como aplicado (`migrate resolve`) antes
+de desplegar. El slug del equipo para las URLs históricas se configura con
+`TEAM_SLUG` (por defecto `hilo`); las URLs `/w/<slug>/...` reciben un 301 a la
+ruta limpia cuando el slug coincide y 404 en cualquier otro caso.
+
+---
+
 ## Estructura
 
 ```
-prisma/          esquema, seed y el generador de PNG que usan los datos de ejemplo
+prisma/          esquema, migraciones, seed y el generador de PNG de los datos de ejemplo
 src/lib/         vocabulario del producto (domain.ts), formato, tipos compartidos
 src/server/
-  auth/          sesiones y guards de workspace por capacidad
+  auth/          sesiones y contexto de equipo; guards por capacidad
   domain/        lógica de negocio: progreso, actividad, feed, búsqueda, proyectos
   actions/       mutaciones validadas con Zod, contrato único ActionResult
                  (incluye propuestas y recursos compartidos)
 src/components/
   ui/            primitivas: botones, campos, capas flotantes, glifos de estado
   app/           piezas del producto: shell, paleta, panel de detalle, tablero
-src/app/         rutas
+src/app/         rutas: el grupo (app) contiene toda la app; (auth) login y alta
+src/middleware.ts  redirección 301 de las URLs históricas /w/<slug>/...
 ```
 
 `src/lib/domain.ts` es la fuente de verdad del vocabulario. Cualquier cambio de
@@ -145,7 +172,7 @@ Tema claro y oscuro, con la preferencia del sistema como valor inicial.
 
 | Tecla | Acción |
 |---|---|
-| `⌘K` / `/` | Buscar en todo el workspace |
+| `⌘K` / `/` | Buscar en todo el equipo |
 | `C` | Crear tarea, idea, nota, problema, decisión o avance |
 | `⌘↵` | Guardar en cualquier compositor |
 | `Esc` | Cerrar panel o diálogo |
@@ -158,7 +185,7 @@ Tema claro y oscuro, con la preferencia del sistema como valor inicial.
 npm run dev          # desarrollo
 npm run build        # build de producción
 npm run typecheck    # tipos sin emitir
-npm run db:reset     # vaciar y volver a sembrar
+npm run db:reset     # borra la base de desarrollo y la vuelve a sembrar
 npm run db:studio    # explorar la base
 ```
 
@@ -169,8 +196,9 @@ npm run db:studio    # explorar la base
 Hilo expone un servidor [MCP](https://modelcontextprotocol.io) (Streamable HTTP) en
 `/api/mcp` para que cualquier IA —Claude, Cursor, opencode, etc.— pueda leer lo que el
 equipo subió: proyectos, tareas, ideas, notas, problemas, decisiones, propuestas,
-recursos y guías de integración. El acceso es de solo lectura y queda acotado al
-workspace del token: la IA ve exactamente lo que vería un miembro con ese rol.
+recursos y guías de integración. El acceso es de solo lectura: la IA ve el equipo
+entero (el contenido es público) y el rol del token gobierna qué operaciones podría
+permitir el contrato.
 
 ### 1. Crear un token
 
@@ -178,8 +206,9 @@ workspace del token: la IA ve exactamente lo que vería un miembro con ese rol.
 2. Elegí la expiración y creá el token: se muestra **una sola vez**, guardalo.
 3. La misma sección muestra la URL del endpoint.
 
-Los tokens se guardan en la base como hash, vencen solos y se revocan en cualquier
-momento desde la misma sección.
+Los tokens se guardan en la base como hash (nunca el valor crudo), vencen solos y se
+revocan en cualquier momento desde la misma sección. Un token creado antes de la
+migración a `Team` sigue siendo válido: su id (el hash) no cambia.
 
 ### 2. Conectar un cliente
 
@@ -223,15 +252,13 @@ configurar en un `.mcp.json` en la raíz del proyecto.
 | `hilo_list_proposals` | propuestas del buzón con sus conversaciones |
 | `hilo_list_resources` | biblioteca de recursos y guías de integración |
 | `hilo_list_people` | quiénes son del equipo y qué hacen |
-| `hilo_get_feed` | actividad reciente del workspace |
+| `hilo_get_feed` | actividad reciente del equipo |
 | `hilo_search` | búsqueda global |
-
-El servidor respeta la visibilidad de cada proyecto (comunidad o solo equipo) según el
-rol del token y aísla los datos por workspace.
 
 ### 4. Límites y seguridad
 
 - Solo lectura: ninguna tool muta datos.
 - 120 pedidos por minuto por token.
-- El token equivale a una contraseña del workspace: mantenelo fuera de repositorios y
-  revocá cualquier token que se filtre.
+- El token equivale a una credencial del equipo: mantenelo fuera de repositorios y
+  revocá cualquier token que se filtre. Si el usuario del token pierde la membresía,
+  las llamadas reciben 403.
