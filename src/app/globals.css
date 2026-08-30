@@ -340,6 +340,239 @@
     text-decoration-thickness: 1px;
   }
 
+  /* --------------------------------------------------------------------
+     Documento del proyecto (el "léeme").
+
+     El único lugar de la app donde el texto largo manda: acá la escala
+     tipográfica compacta de 13px cede a 14px y a un interlineado de lectura,
+     porque esto se lee de arriba a abajo y no se escanea. Sigue siendo el
+     mismo papel y la misma tinta que el resto.
+     -------------------------------------------------------------------- */
+  .prose-doc {
+    color: var(--ink-2);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    word-break: break-word;
+  }
+
+  .prose-doc > *:first-child {
+    margin-top: 0;
+  }
+
+  .prose-doc > *:last-child {
+    margin-bottom: 0;
+  }
+
+  .prose-doc h1,
+  .prose-doc h2,
+  .prose-doc h3,
+  .prose-doc h4,
+  .prose-doc h5,
+  .prose-doc h6 {
+    color: var(--ink);
+    margin: 1.6em 0 0.6em;
+    line-height: 1.3;
+  }
+
+  .prose-doc h1 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  /* Los dos títulos de mayor rango cierran con una línea, como en GitHub:
+     es lo que deja ver la estructura del documento de un vistazo. */
+  .prose-doc h1,
+  .prose-doc h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .prose-doc h2 {
+    font-size: 1.1875rem;
+  }
+
+  .prose-doc h3 {
+    font-size: 1rem;
+  }
+
+  .prose-doc h4,
+  .prose-doc h5,
+  .prose-doc h6 {
+    font-size: 0.875rem;
+  }
+
+  .prose-doc h6 {
+    color: var(--ink-3);
+  }
+
+  .prose-doc p {
+    margin: 0.85em 0;
+  }
+
+  .prose-doc strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .prose-doc a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--accent-line);
+  }
+
+  .prose-doc a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .prose-doc ul,
+  .prose-doc ol {
+    margin: 0.85em 0;
+    padding-left: 1.5em;
+  }
+
+  .prose-doc ul {
+    list-style: disc;
+  }
+
+  .prose-doc ol {
+    list-style: decimal;
+  }
+
+  .prose-doc li {
+    margin: 0.3em 0;
+  }
+
+  .prose-doc li::marker {
+    color: var(--ink-4);
+  }
+
+  .prose-doc li > ul,
+  .prose-doc li > ol {
+    margin: 0.3em 0;
+  }
+
+  /* Listas de tareas de GFM: la viñeta la reemplaza la casilla. */
+  .prose-doc li:has(> input[type="checkbox"]) {
+    list-style: none;
+    margin-left: -1.25em;
+  }
+
+  .prose-doc input[type="checkbox"] {
+    margin-right: 0.5em;
+    accent-color: var(--accent);
+    vertical-align: middle;
+  }
+
+  .prose-doc blockquote {
+    margin: 0.9em 0;
+    padding: 0.1em 0 0.1em 1em;
+    border-left: 3px solid var(--line-strong);
+    color: var(--ink-3);
+  }
+
+  .prose-doc code {
+    font-family: var(--font-mono);
+    font-size: 0.8125em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-xs);
+    padding: 0.12em 0.35em;
+  }
+
+  .prose-doc pre {
+    margin: 1em 0;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    border-radius: var(--r-md);
+    background: #201e1b;
+    color: #f3eee5;
+  }
+
+  .prose-doc pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: inherit;
+  }
+
+  /* La tabla se scrollea sola en pantallas angostas en lugar de romper la
+     página: el contenedor lo pone el componente que renderiza el documento. */
+  .prose-doc table {
+    margin: 1em 0;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .prose-doc th,
+  .prose-doc td {
+    border: 1px solid var(--line);
+    padding: 0.45rem 0.7rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose-doc th {
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .prose-doc tbody tr:nth-child(even) td {
+    background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  }
+
+  .prose-doc img {
+    max-width: 100%;
+    height: auto;
+    margin: 1em 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .prose-doc hr {
+    margin: 1.8em 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .prose-doc details {
+    margin: 1em 0;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+  }
+
+  .prose-doc summary {
+    color: var(--ink);
+    cursor: pointer;
+    font-weight: 560;
+  }
+
+  .prose-doc details[open] summary {
+    margin-bottom: 0.5em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .prose-doc kbd {
+    font-family: var(--font-mono);
+    font-size: 0.75em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--r-xs);
+    padding: 0.1em 0.4em;
+  }
+
   /* Papel rayado sutil detrás de zonas vacías, evita el vacío plano. */
   .grid-paper {
     background-image: radial-gradient(var(--line) 0.5px, transparent 0.5px);

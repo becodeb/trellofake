@@ -10,16 +10,20 @@ export function ProjectTabs({
   projectId,
   counts,
   canWork,
+  hasDoc,
 }: {
   projectId: string;
   counts: { tasks: number; children: number; files: number };
   canWork: boolean;
+  /** El léeme se ofrece si existe, o si esta persona puede escribirlo. */
+  hasDoc: boolean;
 }) {
   const pathname = usePathname();
   const base = `/p/${projectId}`;
 
   const tabs = [
     { href: base, label: "Resumen", exact: true },
+    ...(hasDoc || canWork ? [{ href: `${base}/leeme`, label: "Léeme" }] : []),
     ...(canWork
       ? [
           { href: `${base}/tareas`, label: "Tareas", count: counts.tasks },

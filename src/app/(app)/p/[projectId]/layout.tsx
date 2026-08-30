@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { getTeamContext } from "@/server/auth/context";
 import { getProject } from "@/server/domain/projects";
+import { projectHasDoc } from "@/server/domain/doc";
 import { teamMembers } from "@/server/domain/dashboard";
 import { accentHex } from "@/lib/domain";
 import { ProjectHeader } from "@/components/app/project-header";
@@ -38,9 +39,10 @@ export default async function ProjectLayout({
   const { projectId } = await params;
   const ctx = await getTeamContext();
 
-  const [project, members] = await Promise.all([
+  const [project, members, hasDoc] = await Promise.all([
     getProject(projectId),
     teamMembers(),
+    projectHasDoc(projectId),
   ]);
 
   if (!project) notFound();
@@ -94,6 +96,7 @@ export default async function ProjectLayout({
             files: project._count.attachments,
           }}
           canWork={ctx.can("content.write")}
+          hasDoc={hasDoc}
         />
 
         <div className="pb-12 pt-5">{children}</div>

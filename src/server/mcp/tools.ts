@@ -6,6 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { db } from "@/server/db";
 import { listProjects, getProject } from "@/server/domain/projects";
+import { getProjectDoc } from "@/server/domain/doc";
 import { listItems, getItem } from "@/server/domain/items";
 import { teamFeed } from "@/server/domain/feed";
 import { search } from "@/server/domain/search";
@@ -22,6 +23,7 @@ import {
   type ItemType,
 } from "@/lib/domain";
 import { SEARCH_KIND_LABEL, type SearchKind } from "@/lib/shared";
+import { splitDocSegments } from "@/lib/doc";
 
 /**
  * Herramientas de lectura `hilo_*` (mcp-read-tools).
@@ -116,13 +118,31 @@ export function registerTools(server: McpServer) {
     "hilo_get_project",
     {
       description:
-        "Devuelve un proyecto por id con sus ancestros, subproyectos y enlaces. null si no existe.",
+        "Devuelve un proyecto por id con sus ancestros, subproyectos, enlaces y el " +
+        "léeme (doc): el documento de contexto en Markdown, con qué es el proyecto y " +
+        "qué hace falta para trabajar en él. null si no existe.",
       inputSchema: { projectId: z.string().min(1) },
     },
     async (args: { projectId: string }) => {
-      ctx();
+      const token = ctx();
       const project = await getProject(args.projectId);
-      return textResult(project);
+      if (!project) return textResult(null);
+
+      // El léeme puede tener bloques reservados al equipo. El token de una
+      // cuenta de comunidad recibe el documento recortado, igual que su dueño
+      // lo vería en la web: la IA nunca ve más que la persona que la conectó.
+      const doc = await getProjectDoc(args.projectId);
+      const markdown = doc
+        ? splitDocSegments(doc.markdown)
+            .filter(
+              (segment) =>
+                segment.audience === "everyone" || token.can("content.write"),
+            )
+            .map((segment) => segment.markdown)
+            .join("\n\n")
+        : null;
+
+      return textResult({ ...project, doc: markdown || null });
     },
   );
 

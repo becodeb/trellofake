@@ -69,7 +69,9 @@ function Target({
 
   const href = event.item
     ? `/p/${projectId}?item=${event.item.id}`
-    : `/p/${projectId}`;
+    : event.targetType === "doc"
+      ? `/p/${projectId}/leeme`
+      : `/p/${projectId}`;
 
   return (
     <Link
@@ -146,6 +148,13 @@ export function describe(
         <>
           sumó a <Strong>{String(meta.person ?? "alguien")}</Strong> a {target}
         </>
+      );
+
+    case ACTIVITY.docUpdated:
+      return meta.created ? (
+        <>escribió el léeme de {target}</>
+      ) : (
+        <>actualizó el léeme de {target}</>
       );
 
     case ACTIVITY.linkAdded:

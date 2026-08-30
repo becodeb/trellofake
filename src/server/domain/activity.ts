@@ -34,6 +34,7 @@ export type RecordActivityInput = {
   verb: ActivityVerb;
   targetType:
     | "project"
+    | "doc"
     | "item"
     | "comment"
     | "member"

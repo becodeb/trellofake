@@ -54,6 +54,7 @@ model User {
   proposals       Proposal[]
   proposalReplies ProposalReply[]
   knowledge       KnowledgeResource[]
+  editedDocs      ProjectDoc[]        @relation("ProjectDocEditor")
 }
 
 model Session {
@@ -161,10 +162,29 @@ model Project {
   proposals         Proposal[]          @relation("ProposalTarget")
   promotedProposals Proposal[]          @relation("ProposalPromotion")
   knowledge         KnowledgeResource[]
+  doc               ProjectDoc?
 
   @@index([status, archivedAt])
   @@index([parentId])
   @@index([path])
+}
+
+/// Documento de contexto del proyecto: el "leeme".
+///
+/// Vive en su propia tabla y no como una columna de Project a proposito: asi no
+/// puede colarse en projectCardSelect ni en ningun select de listado. El
+/// markdown puede traer bloques marcados como solo-equipo, y solo se lee
+/// pasando por src/server/domain/doc.ts, que decide que parte devuelve.
+model ProjectDoc {
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  markdown    String   @default("")
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User    @relation("ProjectDocEditor", fields: [updatedById], references: [id])
 }
 
 /// role: "lead" | "contributor"

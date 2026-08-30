@@ -381,6 +381,7 @@ export const ACTIVITY = {
   projectProgress: "project.progress_changed",
   projectMemberAdded: "project.member_added",
   projectMemberRemoved: "project.member_removed",
+  docUpdated: "doc.updated",
   linkAdded: "link.added",
   linkRemoved: "link.removed",
   itemCreated: "item.created",

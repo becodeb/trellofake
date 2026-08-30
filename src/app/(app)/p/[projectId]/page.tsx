@@ -15,6 +15,7 @@ import { ItemRow, InlineComposer } from "@/components/app/item-row";
 import { ActivityLine } from "@/components/app/activity";
 import { CommentThread } from "@/components/app/comments";
 import { ResourceLinks } from "@/components/app/resource-links";
+import { ProjectDocSection } from "@/components/app/project-doc-section";
 import { EmptyState, SectionHeader } from "@/components/ui/layout";
 import { ProgressBar } from "@/components/ui/glyphs";
 
@@ -87,6 +88,10 @@ export default async function ProjectOverview({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_312px]">
       <div className="min-w-0 space-y-8">
+        {/* El contexto antes que el trabajo del día: qué es esto y qué hace
+            falta para tocarlo se lee antes que qué está pasando hoy. */}
+        <ProjectDocSection projectId={project.id} canWrite />
+
         {project.children.length > 0 && (
           <section>
             <SectionHeader title="Se divide en" count={project.children.length} />
@@ -299,6 +304,9 @@ async function CommunityProjectOverview({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-8">
+        {/* Mismo documento, ya recortado: los bloques del equipo no llegan. */}
+        <ProjectDocSection projectId={project.id} canWrite={false} />
+
         {project.children.length > 0 && (
           <section>
             <SectionHeader title="Partes del proyecto" count={project.children.length} />

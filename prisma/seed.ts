@@ -85,6 +85,7 @@ async function main() {
   await db.itemAssignment.deleteMany();
   await db.item.deleteMany();
   await db.resourceLink.deleteMany();
+  await db.projectDoc.deleteMany();
   await db.projectMember.deleteMany();
   await db.project.deleteMany();
   await db.membership.deleteMany();
@@ -318,6 +319,119 @@ async function main() {
     createdBy: juan.id,
     createdAt: ago(70, 9),
     position: 4,
+  });
+
+  // ------------------------------------------------------------------ léeme
+
+  console.log("Escribiendo los léeme…");
+
+  /**
+   * El documento de contexto de un proyecto. El de Lumen muestra el caso que
+   * motivó la sección: las cuentas de prueba viven adentro de un bloque
+   * `:::equipo`, que la comunidad y quien entra sin sesión no ven.
+   */
+  async function doc(input: {
+    project: { id: string; name: string };
+    by: string;
+    at: Date;
+    markdown: string;
+  }) {
+    await db.projectDoc.create({
+      data: {
+        projectId: input.project.id,
+        markdown: input.markdown.trim(),
+        updatedById: input.by,
+        createdAt: input.at,
+        updatedAt: input.at,
+      },
+    });
+
+    event({
+      at: input.at,
+      actorId: input.by,
+      verb: ACTIVITY.docUpdated,
+      targetType: "doc",
+      targetId: input.project.id,
+      targetLabel: input.project.name,
+      projectId: input.project.id,
+      meta: { created: true },
+    });
+  }
+
+  await doc({
+    project: lumen,
+    by: eze.id,
+    at: ago(30, 10),
+    markdown: `
+# Lumen — tienda online
+
+Rehacemos la tienda de Lumen de cero. El cliente vende iluminación técnica y hoy
+carga los productos por mail; la idea es que termine cargándolos solo desde el
+panel, sin pedirnos nada.
+
+## Cómo levantarlo
+
+1. \`npm install\`
+2. Copiar \`.env.example\` a \`.env.local\`
+3. \`npm run dev\` — arranca en el puerto 3000
+
+El catálogo pega contra la API de stock, que en desarrollo responde con datos de
+mentira: no hace falta levantar el backend para trabajar en el frontend.
+
+## Cosas que conviene saber antes de tocar
+
+- **El checkout es lo más frágil.** Toda la lógica de precios con descuento vive
+  en \`lib/pricing.ts\` y no tiene tests todavía.
+- Las imágenes de producto se sirven desde el CDN del cliente. Si una no carga
+  en staging, casi siempre es que todavía no la subieron ellos.
+- El panel de administración es un subproyecto aparte, con su propio deploy.
+
+:::equipo
+## Cuentas de prueba en staging
+
+Son cuentas de mentira, sirven sólo en <https://staging.lumen.com.ar>.
+
+| Rol | Usuario | Clave |
+| --- | --- | --- |
+| Admin | admin@demo.lumen | \`staging-admin\` |
+| Vendedor | ventas@demo.lumen | \`staging-ventas\` |
+| Cliente | cliente@demo.lumen | \`staging-cliente\` |
+
+> Las credenciales de producción no van acá: están en el gestor de contraseñas
+> del estudio. Si alguien necesita acceso, pedírselo a Ezequiel.
+:::
+
+## A quién preguntarle
+
+- **Frontend y diseño:** Valentina
+- **API, stock y deploys:** Juan
+- **Relación con el cliente:** Ezequiel
+`,
+  });
+
+  await doc({
+    project: ronda,
+    by: vale.id,
+    at: ago(14, 11),
+    markdown: `
+# Ronda — app de reservas
+
+Turnos en estudios de grabación. Todavía no hay código: estamos validando el
+flujo con tres estudios reales antes de escribir la primera pantalla.
+
+## En qué estado está
+
+- [x] Entrevistas con los tres estudios
+- [x] Prototipo navegable en Figma
+- [ ] Definir cómo se cobra la seña
+- [ ] Primer sprint de desarrollo
+
+## Lo que ya aprendimos
+
+La reserva **no** termina cuando el músico elige el horario: el estudio la
+confirma a mano porque muchas veces el técnico no está disponible. Cualquier
+diseño que asuma confirmación automática se cae con el primer estudio real.
+`,
   });
 
   // ---------------------------------------------------------------- recursos
