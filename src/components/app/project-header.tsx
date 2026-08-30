@@ -7,6 +7,7 @@ import {
   Check,
   ImagePlus,
   MoreHorizontal,
+  Move,
   Plus,
   RotateCcw,
   Trash2,
@@ -48,6 +49,8 @@ import {
   PopoverTrigger,
   Tooltip,
 } from "@/components/ui/overlays";
+import { coverStyle } from "@/lib/cover";
+import { CoverAdjuster } from "@/components/app/cover-adjuster";
 import { DatePicker, PriorityPicker, ProgressPicker } from "@/components/app/pickers";
 import { NewProjectButton } from "@/components/app/new-project";
 
@@ -73,6 +76,7 @@ export function ProjectHeader({
   const router = useRouter();
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description ?? "");
+  const [adjusting, setAdjusting] = React.useState(false);
   const coverInput = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -112,6 +116,9 @@ export function ProjectHeader({
     else {
       toast.success("Portada actualizada");
       router.refresh();
+      // Recién subida está centrada: es el momento en que uno quiere
+      // acomodarla, así que el recorte se abre solo.
+      setAdjusting(true);
     }
   };
 
@@ -120,17 +127,35 @@ export function ProjectHeader({
       {project.coverUrl && (
         <div className="group relative mb-4 h-36 overflow-hidden rounded-[var(--r-lg)] border border-line sm:h-44">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={project.coverUrl} alt="" className="size-full object-cover" />
+          <img
+            src={project.coverUrl}
+            alt=""
+            className="size-full"
+            style={coverStyle(project)}
+          />
           {canWrite && (
-            <button
-              onClick={() => coverInput.current?.click()}
-              className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-[var(--r-sm)] bg-surface/90 px-2 py-1 text-2xs font-medium text-ink-2 opacity-0 shadow-[var(--shadow-sm)] backdrop-blur-sm transition-opacity group-hover:opacity-100"
-            >
-              <ImagePlus className="size-3" strokeWidth={2} />
-              Cambiar portada
-            </button>
+            <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <CoverButton onClick={() => setAdjusting(true)}>
+                <Move className="size-3" strokeWidth={2} />
+                Acomodar
+              </CoverButton>
+              <CoverButton onClick={() => coverInput.current?.click()}>
+                <ImagePlus className="size-3" strokeWidth={2} />
+                Cambiar portada
+              </CoverButton>
+            </div>
           )}
         </div>
+      )}
+
+      {project.coverUrl && canWrite && (
+        <CoverAdjuster
+          projectId={project.id}
+          coverUrl={project.coverUrl}
+          framing={project}
+          open={adjusting}
+          onOpenChange={setAdjusting}
+        />
       )}
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -177,6 +202,13 @@ export function ProjectHeader({
                 <MenuItem onSelect={() => coverInput.current?.click()}>
                   <ImagePlus className="size-3.5" strokeWidth={1.9} />
                   {project.coverUrl ? "Cambiar portada" : "Poner una portada"}
+                </MenuItem>
+              )}
+
+              {canWrite && project.coverUrl && (
+                <MenuItem onSelect={() => setAdjusting(true)}>
+                  <Move className="size-3.5" strokeWidth={1.9} />
+                  Acomodar la portada
                 </MenuItem>
               )}
 
@@ -341,6 +373,24 @@ export function ProjectHeader({
         }}
       />
     </header>
+  );
+}
+
+/** Botón flotante sobre la portada. Sólo aparece al pasar por encima. */
+function CoverButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-[var(--r-sm)] bg-surface/90 px-2 py-1 text-2xs font-medium text-ink-2 shadow-[var(--shadow-sm)] backdrop-blur-sm transition-colors hover:text-ink"
+    >
+      {children}
+    </button>
   );
 }
 

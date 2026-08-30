@@ -129,6 +129,15 @@ model Project {
   coverUrl    String?
   accent      String  @default("clay")
 
+  /// Encuadre de la portada: qué punto de la imagen queda en el centro del
+  /// recorte (0-100 en cada eje) y cuánto se acerca (100 = sin acercar). Se
+  /// guarda el encuadre, no un recorte: la imagen original queda intacta y el
+  /// mismo punto sirve para la franja del proyecto y para la tarjeta, que
+  /// tienen proporciones distintas.
+  coverX    Int @default(50)
+  coverY    Int @default(50)
+  coverZoom Int @default(100)
+
   /// "active" | "paused" | "done" | "cancelled"
   status String @default("active")
 

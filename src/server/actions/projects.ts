@@ -14,6 +14,7 @@ import {
   ACCENTS,
 } from "@/lib/domain";
 import { detectLinkKind, normalizeUrl, suggestLabel } from "@/lib/links";
+import { normalizeFraming } from "@/lib/cover";
 const optionalDate = z
   .string()
   .trim()
@@ -254,6 +255,34 @@ export async function setProjectProgress(
         meta: { from: project.progress, to: value },
       });
     }
+    revalidateTeam();
+  });
+  return result.ok ? ok() : result;
+}
+
+/**
+ * Acomodar la portada.
+ *
+ * Guarda el encuadre, no un recorte: la imagen original no se toca. Por eso no
+ * escribe actividad —correr una foto dos píxeles no es una novedad para nadie—
+ * y no exige `project.manage`: quien puede subir la portada puede acomodarla.
+ */
+export async function setProjectCover(
+  projectId: string,
+  framing: { coverX: number; coverY: number; coverZoom: number },
+): Promise<ActionResult> {
+  const result = await run(async () => {
+    await requireTeamAction("content.write");
+    const project = await db.project.findFirstOrThrow({
+      where: { id: projectId },
+      select: { id: true, coverUrl: true },
+    });
+    if (!project.coverUrl) throw new Error("Este proyecto no tiene portada.");
+
+    await db.project.update({
+      where: { id: project.id },
+      data: normalizeFraming(framing),
+    });
     revalidateTeam();
   });
   return result.ok ? ok() : result;

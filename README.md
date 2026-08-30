@@ -95,7 +95,42 @@ conservan quién las propuso.
 **Los recursos documentan acceso, no secretos.** La biblioteca admite bases de
 datos, diseños, repositorios, servicios y APIs. Las guías de integración pueden
 guardarse como Markdown o enlazarse a GitHub; Hilo las muestra y permite
-copiarlas para otra persona o una IA. Tokens y contraseñas quedan fuera.
+copiarlas para otra persona o una IA. Tokens y contraseñas quedan fuera: para
+los datos de acceso que el equipo sí necesita compartir está el bloque
+`:::equipo` del léeme, que se explica abajo.
+
+**Cada proyecto tiene un léeme, y es lo primero que se lee.** El equivalente al
+README de un repositorio: qué es el proyecto, cómo se trabaja con él y los datos
+que hacen falta para empezar. Se escribe en Markdown —con barra de herramientas
+para quien no lo conoce— y se puede importar y exportar como `.md` sin pérdida,
+porque lo que se guarda es el texto plano y no un formato propio. Aparece
+plegado arriba del resumen del proyecto y completo en su propia pestaña.
+
+**El documento puede tener partes que no son públicas.** Como todo el contenido
+de Hilo se lee sin sesión, el léeme admite bloques marcados con `:::equipo`:
+
+```markdown
+:::equipo
+Las cuentas de staging, los entornos internos, a quién pedirle acceso.
+:::
+```
+
+Ese recorte pasa en el servidor, antes de convertir el Markdown a HTML: quien no
+tiene rol de equipo no recibe ese texto ni en el HTML ni en el payload de React,
+y el token MCP de una cuenta de comunidad tampoco lo ve. No es CSS ni un filtro
+en el cliente. Aun así, es para datos de prueba y de acceso interno: las
+credenciales de producción siguen viviendo en un gestor de contraseñas, y las
+imágenes que se suban al documento quedan accesibles por su URL directa.
+
+**La portada se acomoda, no se recorta.** Al subir una imagen de portada se
+guarda el archivo original y, aparte, tres números: qué punto de la imagen tiene
+que quedar a la vista (`coverX`, `coverY`) y cuánto se acerca (`coverZoom`). Se
+arrastra la foto dentro del recorte, como al acomodar una foto de perfil. Guardar
+el encuadre en vez del recorte tiene dos ventajas concretas: se puede volver a
+mover mañana sin haber perdido calidad, y el mismo punto sirve para la franja
+ancha del proyecto y para la tarjeta del listado —que es mucho más baja— sin
+pedir dos imágenes. Los valores por defecto (50, 50, 100) son exactamente un
+`object-cover` centrado, así que las portadas viejas se ven igual que siempre.
 
 **Los permisos se preguntan por capacidad, no por rol.** La UI y las acciones
 preguntan `can("project.archive")`, no `role === "admin"`. Agregar un rol
@@ -113,6 +148,7 @@ intermedio más adelante no obliga a tocar cada pantalla.
 | UI | Radix + cmdk + dnd-kit | Accesibilidad y foco resueltos por piezas probadas |
 | Auth | Propia (cookie + tabla de sesiones) | La base guarda el hash del token, no el token |
 | Archivos | Disco local tras una interfaz | `src/server/storage.ts` expone `put`/`get`/`urlFor`: mover a S3 es cambiar ese archivo |
+| Markdown | remark + rehype con `rehype-sanitize` | El léeme se guarda como texto plano; el HTML se arma en el servidor y pasa por una lista blanca |
 
 ---
 
@@ -138,9 +174,11 @@ ruta limpia cuando el slug coincide y 404 en cualquier otro caso.
 ```
 prisma/          esquema, migraciones, seed y el generador de PNG de los datos de ejemplo
 src/lib/         vocabulario del producto (domain.ts), formato, tipos compartidos
+                 (doc.ts: sintaxis del léeme y corte de los bloques :::equipo)
 src/server/
   auth/          sesiones y contexto de equipo; guards por capacidad
   domain/        lógica de negocio: progreso, actividad, feed, búsqueda, proyectos
+                 (doc.ts: Markdown → HTML sanitizado, recortado por audiencia)
   actions/       mutaciones validadas con Zod, contrato único ActionResult
                  (incluye propuestas y recursos compartidos)
 src/components/

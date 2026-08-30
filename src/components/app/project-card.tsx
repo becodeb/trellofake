@@ -5,6 +5,7 @@ import { GitBranch, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { PROJECT_STATUS_META, accentHex, type ProjectStatus } from "@/lib/domain";
 import { dueState, relativeTime } from "@/lib/format";
+import { coverStyle } from "@/lib/cover";
 import { AvatarStack } from "@/components/ui/avatar";
 import { PriorityGlyph, ProgressBar, ToneDot } from "@/components/ui/glyphs";
 import type { ProjectCard as ProjectCardData } from "@/server/domain/projects";
@@ -134,12 +135,17 @@ function Cover({
   if (project.coverUrl) {
     return (
       <div className="relative h-24 overflow-hidden bg-surface-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={project.coverUrl}
-          alt=""
-          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-        />
+        {/* El acercamiento del hover va en el contenedor: la imagen ya usa su
+            propio transform para el encuadre y uno pisaría al otro. */}
+        <div className="size-full transition-transform duration-300 group-hover:scale-[1.02]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={project.coverUrl}
+            alt=""
+            className="size-full"
+            style={coverStyle(project)}
+          />
+        </div>
       </div>
     );
   }

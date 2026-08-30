@@ -1,6 +1,8 @@
 # Hilo — estado del desarrollo
 
-> Última sesión: 29 ago 2026. **Implementado single-team: una instancia = un equipo, lectura pública, rutas planas, migraciones reales. Compila y corre.**
+> Última sesión: 30 ago 2026. **Cada proyecto tiene un léeme: documento de
+> contexto en Markdown, con bloques `:::equipo` que se recortan en el servidor.
+> Compila y corre.**
 > Para el panorama del producto y las decisiones de arquitectura, leer
 > [README.md](README.md). Este archivo es la bitácora de desarrollo.
 
@@ -48,6 +50,10 @@ Las capacidades del MVP, todas verificadas contra la app corriendo:
 | 23 | Derivar o iniciar una idea como proyecto | acciones en `proposals.ts` |
 | 24 | Biblioteca de recursos y guías | `/recursos` + `KnowledgeResource` |
 | 25 | API MCP por token (Streamable HTTP) | `/api/mcp`, scoping al team por membership |
+| 26 | Léeme por proyecto, arriba del resumen y en `/p/[id]/leeme` | `ProjectDoc`, `src/server/domain/doc.ts` |
+| 27 | Editor Markdown con barra, vista previa, import/export `.md` e imágenes | `src/components/app/project-doc-editor.tsx` |
+| 28 | Bloques `:::equipo` recortados en el servidor | `splitDocSegments` en `src/lib/doc.ts` |
+| 29 | Acomodar la portada arrastrándola, con acercamiento | `src/components/app/cover-adjuster.tsx`, `src/lib/cover.ts` |
 
 ### Verificado
 
@@ -64,9 +70,72 @@ Las capacidades del MVP, todas verificadas contra la app corriendo:
   ausente → 401; usuario sin membresía → 403.
 - `tsc --noEmit` limpio y `next build` limpio.
 
+### Verificado del léeme (30 ago)
+
+- **Nada se filtra.** El HTML que recibe un visitante sin sesión en `/p/[id]` y
+  en `/p/[id]/leeme` no contiene ninguna cadena del bloque `:::equipo` del
+  proyecto de ejemplo (cuentas de staging, contraseñas, la nota del gestor):
+  cero coincidencias sobre el HTML crudo, no sobre lo que se ve en pantalla.
+- **Sanitización.** Sobre el pipeline real: `<script>` desaparece, `onerror` /
+  `onclick` / `style` se caen y el `<img>` sobrevive limpio, `href="javascript:"`
+  queda sin `href`, `<iframe>` se borra. Sobreviven `<kbd>`, `<details>`,
+  `<br>`, las tablas con `align` y los bloques con `class="language-*"`.
+- **`:::equipo` dentro de un bloque de código no abre un bloque real**: se
+  renderiza literal, así se puede documentar la propia sintaxis.
+- Guardar escribe `doc.updated`, el historial lo dice en palabras ("Ezequiel
+  actualizó el léeme de Lumen") y hace fan-out a los participantes del proyecto.
+- Importar un `.md`, la vista previa (servidor), la barra de herramientas con
+  la selección preservada, y subir una imagen que queda insertada como
+  `![nombre](/api/files/…)`.
+
+### Verificado del encuadre de portada (30 ago)
+
+- **La migración no toca datos.** `0003_cover_framing` son tres `ALTER TABLE
+  ADD COLUMN` escritos a mano. Se probó sobre una copia sembrada llevada al
+  estado anterior: proyectos 8, subproyectos 4, items 45, subtareas 17,
+  adjuntos 5, actividad 111, léemes 2 — idénticos antes y después, y las
+  portadas existentes quedaron en (50, 50, 100), que es el centrado de siempre.
+- El arrastre mapea 1 a 1 con los píxeles de imagen que sobran: sobre una
+  portada de 960×320 en un recorte de 628×98 sobran 111 px verticales, y
+  arrastrar 53 px movió el encuadre 47 %.
+- Guardar persiste y se aplica igual en la franja del proyecto y en la tarjeta
+  del listado, que recortan distinto.
+
 ---
 
-## Bugs encontrados y arreglados en esta sesión
+## Bugs encontrados y arreglados
+
+### 30 ago — encuadre de portada
+
+- **Los botones de acercar no acumulaban.** `setZoom(value.coverZoom + paso)`
+  lee el valor del render en curso: seis clics rápidos —o dos vueltas de rueda
+  seguidas— contaban como uno. Pasado a `setValue(current => …)`, que suma
+  sobre el valor vigente.
+- **Prisma proponía reconstruir la tabla `Project`** (crear, copiar, `DROP`,
+  renombrar) para agregar tres columnas con valor por defecto. Sobre `Project`
+  esa operación es justo la que en `0001_single_team` se llevó puestos los
+  subproyectos. Reemplazada por `ADD COLUMN`, que no mueve datos.
+- El acercamiento sutil del hover en la tarjeta chocaba con el `transform` del
+  encuadre: uno pisaba al otro. El hover se mudó a un contenedor.
+
+### 30 ago — léeme
+
+- **La barra de herramientas perdía el cursor.** Reposicionar la selección con
+  `requestAnimationFrame` después de `setValue` no sobrevive: al apretar un
+  botón el foco se va al botón y React reemplaza el contenido del textarea
+  después. La restauración tiene que pasar en un efecto sobre `[value]`, ya con
+  el DOM repintado. Sin eso, cada botón mandaba el cursor al principio.
+- **`allowDangerousHtml` sin `rehype-raw` no habilita nada.** El HTML embebido
+  en un `.md` importado (`<details>`, `<kbd>`, `<br>`) se descartaba entero y en
+  silencio. El orden correcto es `remarkRehype({allowDangerousHtml}) → rehypeRaw
+  → rehypeSanitize`: parsear primero y sanitizar último, nunca al revés.
+- **La base de desarrollo local estaba dos PRs atrás** (sin `ApiToken`), así que
+  `migrate resolve --applied 0000_baseline` marcaba como aplicado un baseline
+  que la base no tenía y `migrate deploy` moría en `no such table: ApiToken`.
+  Se regeneró con `db:reset`. En una base de producción real el camino del
+  entrypoint sigue siendo válido; el problema era esta copia vieja.
+
+### 29 ago — single-team
 
 - **`middleware.ts` en la raíz no se ejecutaba.** El repo usa `src/app`:
   Next solo encuentra el middleware dentro de `src/`. La compilación lo

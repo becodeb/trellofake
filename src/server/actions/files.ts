@@ -5,6 +5,7 @@ import { recordActivity } from "@/server/domain/activity";
 import { put, urlFor } from "@/server/storage";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import { ACTIVITY } from "@/lib/domain";
+import { DEFAULT_FRAMING } from "@/lib/cover";
 export type UploadedFile = {
   id: string;
   filename: string;
@@ -115,9 +116,11 @@ export async function uploadCover(
         projectId: project.id,
       },
     });
+    // Una foto nueva arranca centrada: heredar el encuadre de la anterior
+    // deja la portada nueva cortada por una razón que nadie recuerda.
     await db.project.update({
       where: { id: project.id },
-      data: { coverUrl: urlFor(stored.key) },
+      data: { coverUrl: urlFor(stored.key), ...DEFAULT_FRAMING },
     });
     await recordActivity({
       actorId: ctx.user.id,
