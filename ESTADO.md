@@ -163,6 +163,13 @@ Las capacidades del MVP, todas verificadas contra la app corriendo:
   En una base migrada el slug hereda el del workspace histórico (p. ej.
   `cardinal`): definir `TEAM_SLUG` en el deploy de producción a ese valor, o
   re-sembrar. Ya está cableado en `docker-compose.prod.yml`.
+- **Cada deploy copia la base antes de migrarla.** El entrypoint corre antes
+  del `exec` que arranca Next, así que la base está cerrada y una copia tal cual
+  es consistente (no hace falta `sqlite3`, que no está en la imagen). Quedan en
+  `/app/data/backups/prod-<fecha>.db`, se conservan las últimas 5, y si la copia
+  falla el arranque se aborta: migrar sin copia es peor que no desplegar. Ojo:
+  viven en el mismo volumen que la base, así que protegen contra una migración
+  que salga mal, no contra perder el volumen.
 - Bases viejas creadas con `db push` (sin historial): el entrypoint ejecuta
   `migrate resolve --applied 0000_baseline` (con tolerancia a fallo) y luego
   `migrate deploy` para aplicar `0001_single_team`. Nunca `--force-reset`.
