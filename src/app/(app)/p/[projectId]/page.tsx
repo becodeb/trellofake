@@ -344,10 +344,10 @@ async function CommunityProjectOverview({
           <ProgressBar value={project.progress} tone={project.progress === 100 ? "done" : "progress"} className="mt-2" />
           <p className="mt-3 text-xs leading-relaxed text-ink-3">El progreso se actualiza a medida que el equipo termina las partes planificadas.</p>
         </div>
-        <Link href={`/p/${project.id}/integracion`} className="group block rounded-[var(--r-lg)] border border-line bg-surface p-4 transition-colors hover:border-line-strong">
-          <p className="text-sm font-semibold text-ink">Cómo conectarse</p>
+        <Link href={`/p/${project.id}/recursos`} className="group block rounded-[var(--r-lg)] border border-line bg-surface p-4 transition-colors hover:border-line-strong">
+          <p className="text-sm font-semibold text-ink">Recursos</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-3">{guides ? `${guides} recursos y guías disponibles.` : "Todavía no hay una guía pública."}</p>
-          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-ink">Ver integración <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-ink">Ver recursos <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
         </Link>
       </aside>
     </div>

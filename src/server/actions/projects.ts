@@ -12,7 +12,7 @@ import {
   projectLinkSchema as linkSchema,
 } from "@/server/actions/schemas";
 import { ACTIVITY, PROJECT_STATUSES, accentFromId } from "@/lib/domain";
-import { detectLinkKind, normalizeUrl, suggestLabel } from "@/lib/links";
+import { detectResourceKind, normalizeUrl, suggestResourceName } from "@/lib/resources";
 import { normalizeFraming } from "@/lib/cover";
 
 export async function createProject(
@@ -300,6 +300,13 @@ export async function setProjectMembers(
   });
   return result.ok ? ok() : result;
 }
+/**
+ * Agregar un link rápido es agregar un recurso: desde la migración 0004,
+ * `ResourceLink` y `KnowledgeResource` son la misma tabla. Esta acción se
+ * mantiene como una entrada liviana (una URL, el tipo se deduce) para el
+ * "pegá un link" del resumen y de archivos; el formulario completo (resumen,
+ * guía de acceso, markdown) vive en `createResource`.
+ */
 export async function addLink(
   projectId: string,
   raw: unknown,
@@ -312,28 +319,28 @@ export async function addLink(
       where: { id: projectId },
       select: { name: true },
     });
-    const last = await db.resourceLink.findFirst({
+    const last = await db.knowledgeResource.findFirst({
       where: { projectId },
       orderBy: { position: "desc" },
       select: { position: true },
     });
-    const link = await db.resourceLink.create({
+    const resource = await db.knowledgeResource.create({
       data: {
         projectId,
         url,
-        label: input.label?.trim() || suggestLabel(url),
-        kind: detectLinkKind(url),
+        name: input.label?.trim() || suggestResourceName(url),
+        kind: detectResourceKind(url),
         position: (last?.position ?? 0) + 1,
         addedById: ctx.user.id,
       },
-      select: { id: true, label: true },
+      select: { id: true, name: true },
     });
     await recordActivity({
       actorId: ctx.user.id,
       verb: ACTIVITY.linkAdded,
       targetType: "link",
-      targetId: link.id,
-      targetLabel: link.label,
+      targetId: resource.id,
+      targetLabel: resource.name,
       projectId,
       meta: { url, project: project.name },
     });
@@ -348,17 +355,17 @@ export async function removeLink(
 ): Promise<ActionResult> {
   const result = await run(async () => {
     const ctx = await requireTeamAction("content.write");
-    const link = await db.resourceLink.findFirstOrThrow({
-      where: { id: linkId, project: { id: projectId } },
-      select: { label: true },
+    const resource = await db.knowledgeResource.findFirstOrThrow({
+      where: { id: linkId, projectId },
+      select: { name: true },
     });
-    await db.resourceLink.delete({ where: { id: linkId } });
+    await db.knowledgeResource.delete({ where: { id: linkId } });
     await recordActivity({
       actorId: ctx.user.id,
       verb: ACTIVITY.linkRemoved,
       targetType: "link",
       targetId: linkId,
-      targetLabel: link.label,
+      targetLabel: resource.name,
       projectId,
     });
     revalidatePath(`/p/${projectId}`, "layout");

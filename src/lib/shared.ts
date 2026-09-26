@@ -84,7 +84,8 @@ export type SearchKind =
   | "update"
   | "comment"
   | "person"
-  | "file";
+  | "file"
+  | "resource";
 
 export const SEARCH_KIND_LABEL: Record<SearchKind, string> = {
   project: "Proyecto",
@@ -97,6 +98,7 @@ export const SEARCH_KIND_LABEL: Record<SearchKind, string> = {
   comment: "Comentario",
   person: "Persona",
   file: "Archivo",
+  resource: "Recurso",
 };
 
 export type SearchHit = {

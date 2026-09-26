@@ -42,7 +42,7 @@ const projectCardSelect = {
     select: { role: true, user: { select: personSelect } },
     orderBy: { addedAt: "asc" },
   },
-  _count: { select: { children: true, links: true, attachments: true } },
+  _count: { select: { children: true, knowledge: true, attachments: true } },
 } as const;
 
 export type ProjectCard = Awaited<ReturnType<typeof listProjects>>[number];
@@ -192,10 +192,11 @@ export async function getProject(
     where: { id: projectId, ...teamScope() },
     select: {
       ...projectCardSelect,
-      links: {
+      knowledge: {
+        where: { url: { not: null } },
         select: {
           id: true,
-          label: true,
+          name: true,
           url: true,
           kind: true,
           createdAt: true,
@@ -206,6 +207,18 @@ export async function getProject(
     },
   });
   if (!project) return null;
+
+  // `links`: nombre histórico de esta lista, de cuando vivía en su propia
+  // tabla (`ResourceLink`, unificada en 0004). Se conserva la forma —incluido
+  // `label` en vez de `name`— porque `hilo_get_project` la expone por MCP y
+  // clientes existentes esperan ese campo.
+  const { knowledge, ...projectWithoutKnowledge } = project;
+  const links = knowledge.map(({ name, url, ...rest }) => ({
+    ...rest,
+    label: name,
+    // El `where` de arriba ya excluye los recursos sin URL.
+    url: url as string,
+  }));
 
   const ancestorIds = project.path.split("/").filter(Boolean);
 
@@ -236,7 +249,14 @@ export async function getProject(
     return acc;
   }, { ...own });
 
-  return { ...project, ancestors: ordered, children, rollup: own, subtreeRollup: subtree };
+  return {
+    ...projectWithoutKnowledge,
+    links,
+    ancestors: ordered,
+    children,
+    rollup: own,
+    subtreeRollup: subtree,
+  };
 }
 
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProject>>>;
