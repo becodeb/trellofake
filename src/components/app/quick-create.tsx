@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CornerDownLeft, Plus } from "lucide-react";
+import { CornerDownLeft, ImageIcon, Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { ITEM_TYPES, ITEM_TYPE_META, type ItemType, type Priority } from "@/lib/domain";
@@ -20,6 +20,12 @@ import {
   type AssignmentDraft,
   type ProjectOption,
 } from "@/components/app/pickers";
+import {
+  PendingAttachmentsTray,
+  uploadPendingFiles,
+  usePasteFiles,
+  usePendingAttachments,
+} from "@/components/app/use-paste-files";
 
 const LAST_PROJECT_KEY = "hilo-last-project";
 
@@ -95,6 +101,10 @@ export function QuickCreate({
   const [assignees, setAssignees] = React.useState<AssignmentDraft[]>([]);
   const [scope, setScope] = React.useState<"individual" | "team">("individual");
   const [pending, setPending] = React.useState(false);
+  const [dragOver, setDragOver] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { items: files, addFiles, removeFile, clear: clearFiles } = usePendingAttachments();
+  const onPaste = usePasteFiles(addFiles);
 
   // Cada apertura arranca limpia, pero respeta el contexto desde donde se abrió.
   React.useEffect(() => {
@@ -107,7 +117,8 @@ export function QuickCreate({
     setDueDate(null);
     setAssignees([]);
     setScope("individual");
-  }, [open, defaultType, defaultProjectId, projects]);
+    clearFiles();
+  }, [open, defaultType, defaultProjectId, projects, clearFiles]);
 
   const meta = ITEM_TYPE_META[type];
   const isTask = meta.schedulable;
@@ -126,13 +137,25 @@ export function QuickCreate({
       assigneeIds: isTask && scope === "individual" ? assignees.map((a) => a.userId) : [],
       assigneeScope: isTask ? scope : "individual",
     });
-    setPending(false);
 
     if (!result.ok) {
+      setPending(false);
       toast.error(result.error);
       return;
     }
 
+    // El elemento ya existe: si la subida falla no hay que perderlo, solo avisar.
+    if (files.length > 0) {
+      const uploaded = await uploadPendingFiles(
+        files.map((f) => f.file),
+        { projectId, itemId: result.data.id },
+      );
+      if (!uploaded.ok) {
+        toast.error(`Se creó, pero no se pudieron adjuntar los archivos: ${uploaded.error}`);
+      }
+    }
+
+    setPending(false);
     saveLastProject(projectId);
     toast.success(`${meta.label} creada`, { description: title.trim() });
     onOpenChange(false);
@@ -154,6 +177,7 @@ export function QuickCreate({
         description="Elegí qué querés dejar registrado."
         width="md"
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
       >
         {/* Segmentado de tipos: el vocabulario de la app, a la vista. */}
         <div className="mx-5 mb-3.5 flex flex-wrap gap-1 rounded-[var(--r-md)] bg-surface-2 p-1">
@@ -212,6 +236,47 @@ export function QuickCreate({
             {type === "problem" && (
               <PriorityPicker value={priority} onChange={setPriority} />
             )}
+          </div>
+
+          <div
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragOver(false);
+              addFiles(event.dataTransfer.files);
+            }}
+            className="mt-2.5 border-t border-line-soft pt-2.5"
+          >
+            {files.length > 0 && (
+              <PendingAttachmentsTray items={files} onRemove={removeFile} className="mb-2" />
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "flex w-full items-center justify-center gap-1.5 rounded-[var(--r-md)] border border-dashed px-3 py-2 text-xs transition-colors",
+                dragOver
+                  ? "border-accent bg-accent-wash text-accent-ink"
+                  : "border-line text-ink-4 hover:border-line-strong hover:text-ink-3",
+              )}
+            >
+              <ImageIcon className="size-3.5" strokeWidth={1.9} />
+              Agregar imagen o archivo
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(event) => {
+                addFiles(event.target.files ?? []);
+                event.target.value = "";
+              }}
+            />
           </div>
         </div>
 

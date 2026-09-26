@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CornerDownLeft, Trash2 } from "lucide-react";
+import { CornerDownLeft, Paperclip, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/format";
@@ -13,6 +13,12 @@ import { Avatar, type PersonLike } from "@/components/ui/avatar";
 import { Button, RowAction } from "@/components/ui/button";
 import { AutoTextarea } from "@/components/ui/field";
 import { Kbd, Tooltip } from "@/components/ui/overlays";
+import {
+  PendingAttachmentsTray,
+  uploadPendingFiles,
+  usePasteFiles,
+  usePendingAttachments,
+} from "@/components/app/use-paste-files";
 
 export type CommentData = {
   id: string;
@@ -184,6 +190,9 @@ export function CommentComposer({
   const [pending, setPending] = React.useState(false);
   const [mentionQuery, setMentionQuery] = React.useState<string | null>(null);
   const ref = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { items: files, addFiles, removeFile, clear: clearFiles } = usePendingAttachments();
+  const onPaste = usePasteFiles(addFiles);
 
   const candidates =
     mentionQuery === null
@@ -214,7 +223,22 @@ export function CommentComposer({
     if (!body || pending) return;
 
     setPending(true);
-    const result = await addComment({ body, itemId, projectId, attachmentIds: [] });
+
+    let attachmentIds: string[] = [];
+    if (files.length > 0) {
+      const uploaded = await uploadPendingFiles(
+        files.map((f) => f.file),
+        { itemId, projectId },
+      );
+      if (!uploaded.ok) {
+        // El comentario igual se publica: mejor sin la imagen que perder el texto.
+        toast.error(`No se pudieron adjuntar los archivos: ${uploaded.error}`);
+      } else {
+        attachmentIds = uploaded.data.map((f) => f.id);
+      }
+    }
+
+    const result = await addComment({ body, itemId, projectId, attachmentIds });
     setPending(false);
 
     if (!result.ok) {
@@ -222,6 +246,7 @@ export function CommentComposer({
       return;
     }
     setValue("");
+    clearFiles();
     router.refresh();
   };
 
@@ -229,7 +254,7 @@ export function CommentComposer({
     <div className="relative flex gap-2.5 pt-1">
       {viewer && <Avatar person={viewer} size="sm" className="mt-1.5" />}
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" onPaste={onPaste}>
         <AutoTextarea
           ref={ref}
           value={value}
@@ -246,6 +271,30 @@ export function CommentComposer({
           }}
           placeholder={placeholder}
           minRows={2}
+        />
+
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <Tooltip content="Adjuntar imagen o archivo">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Adjuntar imagen o archivo"
+              className="grid size-6 shrink-0 place-items-center rounded-[var(--r-sm)] text-ink-4 transition-colors hover:bg-surface-2 hover:text-ink-2"
+            >
+              <Paperclip className="size-3.5" strokeWidth={1.9} />
+            </button>
+          </Tooltip>
+          <PendingAttachmentsTray items={files} onRemove={removeFile} />
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) => {
+            addFiles(event.target.files ?? []);
+            event.target.value = "";
+          }}
         />
 
         {candidates.length > 0 && (
