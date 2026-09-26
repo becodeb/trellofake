@@ -232,11 +232,11 @@ npm run db:studio    # explorar la base
 ## Conectar una IA (MCP)
 
 Hilo expone un servidor [MCP](https://modelcontextprotocol.io) (Streamable HTTP) en
-`/api/mcp` para que cualquier IA —Claude, Cursor, opencode, etc.— pueda leer lo que el
-equipo subió: proyectos, tareas, ideas, notas, problemas, decisiones, propuestas,
-recursos y guías de integración. El acceso es de solo lectura: la IA ve el equipo
-entero (el contenido es público) y el rol del token gobierna qué operaciones podría
-permitir el contrato.
+`/api/mcp` para que cualquier IA —Claude, Cursor, opencode, etc.— lea y escriba lo
+mismo que el equipo ve en la app: proyectos, tareas, ideas, notas, problemas,
+decisiones, propuestas, recursos y guías de integración. La IA actúa como el usuario
+del token: cada llamada de escritura corre la misma server action que un click en la
+UI, con el mismo chequeo de rol (`requireTeamAction`) y la misma actividad en el feed.
 
 ### 1. Crear un token
 
@@ -283,6 +283,8 @@ configurar en un `.mcp.json` en la raíz del proyecto.
 
 ### 3. Qué puede hacer la IA
 
+**Lectura**
+
 | Tool | Qué lee |
 |---|---|
 | `hilo_list_projects` / `hilo_get_project` | proyectos y subproyectos |
@@ -293,9 +295,30 @@ configurar en un `.mcp.json` en la raíz del proyecto.
 | `hilo_get_feed` | actividad reciente del equipo |
 | `hilo_search` | búsqueda global |
 
+**Escritura** — mismo permiso que la persona dueña del token tendría en la app:
+
+| Área | Tools |
+|---|---|
+| Elementos | `hilo_create_item`, `hilo_update_item`, `hilo_set_item_status`, `hilo_set_item_progress`, `hilo_set_item_assignees`, `hilo_convert_item_to_task`, `hilo_move_item`, `hilo_delete_item`, `hilo_recompute_project` |
+| Proyectos | `hilo_create_project`, `hilo_update_project`, `hilo_set_project_status`, `hilo_restore_project`, `hilo_set_project_progress`, `hilo_set_project_cover_framing`, `hilo_set_project_members`, `hilo_add_project_link`, `hilo_remove_project_link`, `hilo_delete_project` |
+| Comentarios | `hilo_add_comment`, `hilo_edit_comment`, `hilo_delete_comment` |
+| Propuestas | `hilo_create_proposal`, `hilo_reply_to_proposal`, `hilo_triage_proposal`, `hilo_promote_proposal` |
+| Recursos | `hilo_create_resource`, `hilo_delete_resource` |
+| Léeme del proyecto | `hilo_save_project_doc`, `hilo_preview_project_doc` |
+| Archivos | `hilo_upload_files`, `hilo_upload_project_cover`, `hilo_delete_attachment` (los archivos van en base64: `{filename, mimeType, base64}`, hasta 10 MB decodificados) |
+| Equipo | `hilo_update_team`, `hilo_add_member`, `hilo_set_member_role`, `hilo_remove_member`, `hilo_mark_read` |
+| Perfil | `hilo_update_profile` |
+
+No expuesto por MCP, a propósito: alta de cuenta, login/logout, cambio de contraseña,
+creación/revocación de tokens de API (un token no puede acuñar tokens) y el ping de
+presencia (`touchVisit`).
+
 ### 4. Límites y seguridad
 
-- Solo lectura: ninguna tool muta datos.
+- Lectura y escritura: cada tool de escritura corre la misma server action y el mismo
+  chequeo de rol que la UI. Una cuenta de comunidad conectada por MCP tiene las mismas
+  limitaciones que tendría en el navegador (por ejemplo, no puede crear proyectos ni
+  gestionar el equipo).
 - 120 pedidos por minuto por token.
 - El token equivale a una credencial del equipo: mantenelo fuera de repositorios y
   revocá cualquier token que se filtre. Si el usuario del token pierde la membresía,

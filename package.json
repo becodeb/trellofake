@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "rm -f prisma/dev.db && npm run setup",
     "db:studio": "prisma studio",
-    "setup": "prisma generate && npx prisma migrate deploy && npm run db:seed"
+    "setup": "prisma generate && npx prisma migrate deploy && npm run db:seed",
+    "ext:icons": "node scripts/make-extension-icons.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

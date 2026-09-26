@@ -50,7 +50,6 @@ model User {
   activities      Activity[]
   feed            FeedEntry[]
   createdProjects Project[]           @relation("ProjectAuthor")
-  resourceLinks   ResourceLink[]
   proposals       Proposal[]
   proposalReplies ProposalReply[]
   knowledge       KnowledgeResource[]
@@ -166,7 +165,6 @@ model Project {
   items             Item[]
   comments          Comment[]
   attachments       Attachment[]
-  links             ResourceLink[]
   activities        Activity[]
   proposals         Proposal[]          @relation("ProposalTarget")
   promotedProposals Proposal[]          @relation("ProposalPromotion")
@@ -335,37 +333,24 @@ model Attachment {
   width  Int?
   height Int?
 
-  projectId String?
-  itemId    String?
-  commentId String?
-  createdAt DateTime @default(now())
+  projectId  String?
+  itemId     String?
+  commentId  String?
+  /// Cuando el archivo es la captura de un recurso de conocimiento (screenshot
+  /// del sitio, del panel, etc.), en vez de ir colgado de un proyecto o tarea.
+  resourceId String?
+  createdAt  DateTime @default(now())
 
-  uploader User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  project  Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  item     Item?     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  comment  Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploader User               @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  project  Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item     Item?              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  comment  Comment?           @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  resource KnowledgeResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
   @@index([itemId])
   @@index([kind])
-}
-
-/// Links libres del proyecto (GitHub, Figma, Drive, staging, docs...).
-/// `kind` se autodetecta desde la URL pero es editable.
-model ResourceLink {
-  id        String   @id @default(cuid())
-  projectId String
-  label     String
-  url       String
-  kind      String   @default("link")
-  position  Float    @default(0)
-  addedById String
-  createdAt DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  addedBy User    @relation(fields: [addedById], references: [id])
-
-  @@index([projectId, position])
+  @@index([resourceId])
 }
 
 // ------------------------------------------------ propuestas de la comunidad
@@ -424,11 +409,15 @@ model KnowledgeResource {
   markdown    String?
   markdownUrl String?
 
+  /// Orden dentro de un proyecto, igual que `ResourceLink.position` antes de
+  /// unificarse acá: lo que se pegó primero queda primero.
+  position  Float    @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  addedBy User     @relation(fields: [addedById], references: [id])
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy     User         @relation(fields: [addedById], references: [id])
+  attachments Attachment[]
 
   @@index([kind])
   @@index([projectId, kind])

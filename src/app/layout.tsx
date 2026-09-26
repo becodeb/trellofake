@@ -3,6 +3,7 @@ import { Inter, Instrument_Serif } from "next/font/google";
 import { Toaster } from "sonner";
 
 import { TooltipProvider } from "@/components/ui/overlays";
+import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,6 +31,13 @@ export const metadata: Metadata = {
   },
   description:
     "El punto de encuentro entre una comunidad y el equipo que construye sus aplicaciones.",
+  // iOS no lee el manifiesto para "Agregar a inicio": necesita estas meta
+  // etiquetas propias para abrir en modo standalone y usar el nombre corto.
+  appleWebApp: {
+    capable: true,
+    title: "Hilo",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
@@ -54,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={`${inter.variable} ${display.variable} antialiased`}>
+        <PwaRegister />
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster
           position="bottom-right"

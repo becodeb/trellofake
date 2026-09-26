@@ -13,9 +13,11 @@ import {
   FileText,
   Figma,
   GitBranch,
+  Globe,
   Link2,
   Plus,
   Server,
+  Terminal,
   Trash2,
 } from "lucide-react";
 
@@ -24,7 +26,10 @@ import {
   RESOURCE_KIND_LABEL,
   type ResourceKind,
 } from "@/lib/domain";
+import { detectResourceKind, suggestResourceName } from "@/lib/resources";
 import { createResource, deleteResource } from "@/server/actions/resources";
+import { uploadFiles } from "@/server/actions/files";
+import { fileUrl } from "@/components/app/attachments";
 import { Button } from "@/components/ui/button";
 import { AutoTextarea, Field, Input } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/overlays";
@@ -41,6 +46,8 @@ export type KnowledgeResourceData = {
   resolvedMarkdown: string | null;
   project: { id: string; name: string } | null;
   addedBy: { name: string };
+  /** Primera captura subida, si la tiene: se muestra como miniatura de la tarjeta. */
+  screenshot: { storageKey: string } | null;
 };
 
 type ProjectOption = { id: string; name: string };
@@ -109,11 +116,33 @@ function ResourceCard({
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const shotInput = React.useRef<HTMLInputElement>(null);
   const Icon = iconFor(resource.kind);
   const guide = resource.resolvedMarkdown ?? resource.markdown;
 
+  const uploadShot = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    const data = new FormData();
+    data.set("resourceId", resource.id);
+    data.append("files", file);
+    const result = await uploadFiles(data);
+    setUploading(false);
+    if (!result.ok) toast.error(result.error);
+    else router.refresh();
+  };
+
   return (
-    <article className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
+    <article id={resource.id} className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
+      {resource.screenshot && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={fileUrl(resource.screenshot.storageKey)}
+          alt=""
+          className="h-32 w-full border-b border-line-soft object-cover"
+        />
+      )}
       <div className="flex items-start gap-3 p-4">
         <span className="grid size-9 shrink-0 place-items-center rounded-[var(--r-md)] bg-surface-2 text-ink-3">
           <Icon className="size-4" strokeWidth={1.8} />
@@ -142,6 +171,15 @@ function ResourceCard({
                 {open ? "Ocultar instrucciones" : "Ver cómo usarlo"}
               </button>
             )}
+            {canManage && (
+              <button
+                disabled={uploading}
+                onClick={() => shotInput.current?.click()}
+                className="text-ink-3 hover:text-ink disabled:opacity-60"
+              >
+                {uploading ? "Subiendo…" : resource.screenshot ? "Cambiar captura" : "Agregar captura"}
+              </button>
+            )}
           </div>
         </div>
         {canManage && (
@@ -158,6 +196,19 @@ function ResourceCard({
           </button>
         )}
       </div>
+
+      {canManage && (
+        <input
+          ref={shotInput}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(event) => {
+            void uploadShot(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+      )}
 
       {open && (resource.accessGuide || guide) && (
         <div className="border-t border-line-soft bg-paper/50 p-4">
@@ -218,6 +269,9 @@ function ResourceDialog({
   const [markdownUrl, setMarkdownUrl] = React.useState("");
   const [projectId, setProjectId] = React.useState(defaultProjectId ?? "");
   const [pending, setPending] = React.useState(false);
+  // Si todavía no se tocaron a mano, pegar una URL completa los rellena solo.
+  const nameTouched = React.useRef(false);
+  const kindTouched = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -229,7 +283,16 @@ function ResourceDialog({
     setMarkdown("");
     setMarkdownUrl("");
     setProjectId(defaultProjectId ?? "");
+    nameTouched.current = false;
+    kindTouched.current = false;
   }, [open, defaultProjectId]);
+
+  const applyUrl = (value: string) => {
+    setUrl(value);
+    if (!/^https?:\/\//i.test(value.trim())) return;
+    if (!kindTouched.current) setKind(detectResourceKind(value));
+    if (!nameTouched.current) setName(suggestResourceName(value));
+  };
 
   const submit = async () => {
     setPending(true);
@@ -257,15 +320,34 @@ function ResourceDialog({
       <DialogContent title="Agregar recurso" description="Dejá suficiente contexto para que otra persona pueda usarlo sin preguntarte por otro medio." width="lg">
         <div className="max-h-[68dvh] space-y-3.5 overflow-y-auto px-5 pb-1">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nombre"><Input value={name} onChange={(event) => setName(event.target.value)} autoFocus placeholder="Base de empleados" /></Field>
+            <Field label="Nombre">
+              <Input
+                value={name}
+                onChange={(event) => {
+                  nameTouched.current = true;
+                  setName(event.target.value);
+                }}
+                autoFocus
+                placeholder="Base de empleados"
+              />
+            </Field>
             <Field label="Tipo">
-              <select value={kind} onChange={(event) => setKind(event.target.value as ResourceKind)} className="h-8.5 w-full rounded-[var(--r-md)] border border-line bg-surface px-2.5 text-sm">
+              <select
+                value={kind}
+                onChange={(event) => {
+                  kindTouched.current = true;
+                  setKind(event.target.value as ResourceKind);
+                }}
+                className="h-8.5 w-full rounded-[var(--r-md)] border border-line bg-surface px-2.5 text-sm"
+              >
                 {RESOURCE_KINDS.map((option) => <option key={option} value={option}>{RESOURCE_KIND_LABEL[option]}</option>)}
               </select>
             </Field>
           </div>
           <Field label="Qué contiene"><Input value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Listado institucional de personal, áreas y cargos." /></Field>
-          <Field label="Enlace" hint="Página, repositorio, panel o documentación."><Input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" /></Field>
+          <Field label="Enlace" hint="Pegá la URL: el tipo y el nombre se completan solos.">
+            <Input type="url" value={url} onChange={(event) => applyUrl(event.target.value)} placeholder="https://…" />
+          </Field>
           <Field label="Cómo se accede" hint="Indicá a quién pedir permiso o qué cuenta usar. No guardes contraseñas ni tokens acá.">
             <AutoTextarea value={accessGuide} onChange={(event) => setAccessGuide(event.target.value)} minRows={3} placeholder="Solicitar acceso al área de Sistemas; la vista disponible es solo lectura." />
           </Field>
@@ -300,6 +382,8 @@ function iconFor(kind: string) {
     design: Figma,
     document: FileText,
     service: Server,
+    site: Globe,
+    local: Terminal,
     link: Link2,
   }[kind] ?? Link2;
 }

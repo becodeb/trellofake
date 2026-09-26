@@ -4,6 +4,8 @@
 
 Exposes Hilo team data to AI clients over the Model Context Protocol (Streamable HTTP) at `/api/mcp`. The endpoint authenticates requests with API tokens and serves read-only tool calls scoped to the singleton team.
 
+> **Note (2026-09-26):** the server now also dispatches write tools (see `mcp-write-tools`) that run the app's own server actions as the token's user. The "read-only tool dispatch" requirement below still holds for the `hilo_*` read tools; it does not describe the endpoint as a whole anymore.
+
 ## Requirements
 
 ### Requirement: Streamable HTTP endpoint

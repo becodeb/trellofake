@@ -7,31 +7,13 @@ import { recordActivity } from "@/server/domain/activity";
 import { refreshProject } from "@/server/domain/progress";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import {
-  ACTIVITY,
-  PRIORITIES,
-  PROJECT_STATUSES,
-  accentFromId,
-  ACCENTS,
-} from "@/lib/domain";
-import { detectLinkKind, normalizeUrl, suggestLabel } from "@/lib/links";
+  projectCreateSchema as createSchema,
+  projectUpdateSchema as updateSchema,
+  projectLinkSchema as linkSchema,
+} from "@/server/actions/schemas";
+import { ACTIVITY, PROJECT_STATUSES, accentFromId } from "@/lib/domain";
+import { detectResourceKind, normalizeUrl, suggestResourceName } from "@/lib/resources";
 import { normalizeFraming } from "@/lib/cover";
-const optionalDate = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value ? new Date(value) : null))
-  .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-const createSchema = z.object({
-  name: z.string().trim().min(2, "El proyecto necesita un nombre."),
-  description: z.string().trim().max(2000).optional(),
-  parentId: z.string().trim().optional(),
-  priority: z.enum(PRIORITIES).default("medium"),
-  accent: z.enum(ACCENTS).optional(),
-  startDate: optionalDate,
-  targetDate: optionalDate,
-  memberIds: z.array(z.string()).default([]),
-  coverUrl: z.string().trim().optional(),
-});
 
 export async function createProject(
   raw: unknown,
@@ -94,16 +76,6 @@ export async function createProject(
     return { id: project.id };
   });
 }
-const updateSchema = z.object({
-  name: z.string().trim().min(2).optional(),
-  description: z.string().trim().max(4000).nullable().optional(),
-  priority: z.enum(PRIORITIES).optional(),
-  accent: z.enum(ACCENTS).optional(),
-  startDate: optionalDate.optional(),
-  targetDate: optionalDate.optional(),
-  coverUrl: z.string().trim().nullable().optional(),
-});
-
 export async function updateProject(
   projectId: string,
   raw: unknown,
@@ -328,11 +300,13 @@ export async function setProjectMembers(
   });
   return result.ok ? ok() : result;
 }
-const linkSchema = z.object({
-  url: z.string().trim().min(3, "Pegá una URL."),
-  label: z.string().trim().max(80).optional(),
-});
-
+/**
+ * Agregar un link rápido es agregar un recurso: desde la migración 0004,
+ * `ResourceLink` y `KnowledgeResource` son la misma tabla. Esta acción se
+ * mantiene como una entrada liviana (una URL, el tipo se deduce) para el
+ * "pegá un link" del resumen y de archivos; el formulario completo (resumen,
+ * guía de acceso, markdown) vive en `createResource`.
+ */
 export async function addLink(
   projectId: string,
   raw: unknown,
@@ -345,28 +319,28 @@ export async function addLink(
       where: { id: projectId },
       select: { name: true },
     });
-    const last = await db.resourceLink.findFirst({
+    const last = await db.knowledgeResource.findFirst({
       where: { projectId },
       orderBy: { position: "desc" },
       select: { position: true },
     });
-    const link = await db.resourceLink.create({
+    const resource = await db.knowledgeResource.create({
       data: {
         projectId,
         url,
-        label: input.label?.trim() || suggestLabel(url),
-        kind: detectLinkKind(url),
+        name: input.label?.trim() || suggestResourceName(url),
+        kind: detectResourceKind(url),
         position: (last?.position ?? 0) + 1,
         addedById: ctx.user.id,
       },
-      select: { id: true, label: true },
+      select: { id: true, name: true },
     });
     await recordActivity({
       actorId: ctx.user.id,
       verb: ACTIVITY.linkAdded,
       targetType: "link",
-      targetId: link.id,
-      targetLabel: link.label,
+      targetId: resource.id,
+      targetLabel: resource.name,
       projectId,
       meta: { url, project: project.name },
     });
@@ -381,17 +355,17 @@ export async function removeLink(
 ): Promise<ActionResult> {
   const result = await run(async () => {
     const ctx = await requireTeamAction("content.write");
-    const link = await db.resourceLink.findFirstOrThrow({
-      where: { id: linkId, project: { id: projectId } },
-      select: { label: true },
+    const resource = await db.knowledgeResource.findFirstOrThrow({
+      where: { id: linkId, projectId },
+      select: { name: true },
     });
-    await db.resourceLink.delete({ where: { id: linkId } });
+    await db.knowledgeResource.delete({ where: { id: linkId } });
     await recordActivity({
       actorId: ctx.user.id,
       verb: ACTIVITY.linkRemoved,
       targetType: "link",
       targetId: linkId,
-      targetLabel: link.label,
+      targetLabel: resource.name,
       projectId,
     });
     revalidatePath(`/p/${projectId}`, "layout");

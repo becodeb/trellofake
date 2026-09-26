@@ -43,6 +43,11 @@ import {
 } from "@/components/app/pickers";
 import { CommentThread } from "@/components/app/comments";
 import { AttachmentGrid, FileDrop } from "@/components/app/attachments";
+import {
+  filterUploadableFiles,
+  uploadPendingFiles,
+  usePasteFiles,
+} from "@/components/app/use-paste-files";
 import { InlineComposer, ItemRow } from "@/components/app/item-row";
 import { ActivityLine } from "@/components/app/activity";
 
@@ -179,8 +184,27 @@ function ItemBody({
 
   const subtasksDone = item.children.filter((c) => c.status === "done").length;
 
+  // Pegar una captura mientras el panel tiene el foco la adjunta al toque, sin
+  // pasar por el selector de archivos; el elemento ya existe, así que se sube
+  // directo (a diferencia de la creación rápida, acá no hay nada que encolar).
+  const onPasteAttach = usePasteFiles(async (pasted) => {
+    const { accepted, rejectedMessage } = filterUploadableFiles(pasted);
+    if (rejectedMessage) toast.error(rejectedMessage);
+    if (accepted.length === 0) return;
+    const result = await uploadPendingFiles(accepted, {
+      itemId: item.id,
+      projectId: item.projectId,
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(result.data.length === 1 ? "Imagen pegada" : `${result.data.length} archivos pegados`);
+    onChanged();
+  });
+
   return (
-    <>
+    <div className="contents" onPaste={onPasteAttach}>
       {/* Encabezado fijo: siempre se ve dónde estás parado y cómo salir. */}
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-2xs text-ink-4">
@@ -410,7 +434,7 @@ function ItemBody({
             itemId={item.id}
             projectId={item.projectId}
             compact
-            label="Soltá un archivo o imagen"
+            label="Agregar imagen o archivo"
           />
         </Section>
 
@@ -461,7 +485,7 @@ function ItemBody({
           </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

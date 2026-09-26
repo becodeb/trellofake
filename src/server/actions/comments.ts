@@ -4,17 +4,8 @@ import { db } from "@/server/db";
 import { requireTeamAction } from "@/server/auth/context";
 import { parseMentions, recordActivity } from "@/server/domain/activity";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
+import { commentSchema as schema } from "@/server/actions/schemas";
 import { ACTIVITY, isTeamRole } from "@/lib/domain";
-const schema = z
-  .object({
-    body: z.string().trim().min(1, "Escribí algo.").max(8000),
-    itemId: z.string().trim().optional(),
-    projectId: z.string().trim().optional(),
-    attachmentIds: z.array(z.string()).default([]),
-  })
-  .refine((v) => Boolean(v.itemId) !== Boolean(v.projectId), {
-    message: "Un comentario va en un elemento o en un proyecto.",
-  });
 
 export async function addComment(
   raw: unknown,

@@ -32,7 +32,7 @@ export function ProjectTabs({
           { href: `${base}/archivos`, label: "Archivos", count: counts.files },
         ]
       : []),
-    { href: `${base}/integracion`, label: "Cómo conectarse" },
+    { href: `${base}/recursos`, label: "Recursos" },
   ];
 
   return (

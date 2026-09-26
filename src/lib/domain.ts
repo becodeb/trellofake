@@ -87,6 +87,8 @@ export const RESOURCE_KINDS = [
   "design",
   "document",
   "service",
+  "site",
+  "local",
   "link",
 ] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
@@ -97,6 +99,8 @@ export const RESOURCE_KIND_LABEL: Record<ResourceKind, string> = {
   design: "Diseños",
   document: "Documentación",
   service: "Servicio",
+  site: "Sitio",
+  local: "Entorno local",
   link: "Enlace",
 };
 

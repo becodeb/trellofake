@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { ExternalLink, Plus, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { LINK_KIND_LABEL, normalizeUrl, prettyUrl, type LinkKind } from "@/lib/links";
+import { RESOURCE_KIND_LABEL, type ResourceKind } from "@/lib/domain";
+import { normalizeUrl, prettyUrl } from "@/lib/resources";
 import { addLink, removeLink } from "@/server/actions/projects";
 import { Input } from "@/components/ui/field";
 import { RowAction } from "@/components/ui/button";
@@ -124,7 +125,7 @@ export function ResourceLinks({
 
 /** Etiqueta corta del tipo de recurso, en el color de la tinta secundaria. */
 function KindBadge({ kind }: { kind: string }) {
-  const label = LINK_KIND_LABEL[kind as LinkKind] ?? "Link";
+  const label = RESOURCE_KIND_LABEL[kind as ResourceKind] ?? "Enlace";
   return (
     <span className="w-[74px] shrink-0 truncate text-2xs uppercase tracking-[0.06em] text-ink-4">
       {label}

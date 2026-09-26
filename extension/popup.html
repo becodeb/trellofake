@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hilo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="popup">
+    <!-- Sin token configurado: no hay nada más que mostrar que el link a
+         opciones (ver popup.js → renderNoToken). -->
+    <div id="app">
+      <div class="header">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="who">
+          <div class="team" id="team-name">Hilo</div>
+          <div class="person" id="person-name">Cargando…</div>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-note" role="tab" aria-selected="true">Anotar</button>
+        <button class="tab" id="tab-resource" role="tab" aria-selected="false">Guardar como recurso</button>
+      </div>
+
+      <!-- ------------------------------------------------------- Anotar -->
+      <section class="panel" id="panel-note">
+        <div id="note-project-banner"></div>
+
+        <div class="type-picker" id="type-picker">
+          <button type="button" data-type="task" aria-pressed="true">Tarea</button>
+          <button type="button" data-type="idea" aria-pressed="false">Idea</button>
+          <button type="button" data-type="problem" aria-pressed="false">Problema</button>
+          <button type="button" data-type="note" aria-pressed="false">Nota</button>
+        </div>
+
+        <div class="field">
+          <label for="note-title">Título</label>
+          <input type="text" id="note-title" placeholder="¿Qué viste?" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="note-body">Notas</label>
+          <textarea id="note-body" placeholder="Detalles, opcional"></textarea>
+        </div>
+
+        <button type="button" class="btn btn-block" id="note-capture">Capturar pantalla</button>
+        <div class="shots" id="note-shots"></div>
+
+        <p class="hint">También podés pegar una captura con Ctrl+V (⌘V en Mac).</p>
+
+        <button type="button" class="btn btn-primary btn-block" id="note-submit">Guardar en Hilo</button>
+        <div id="note-status"></div>
+      </section>
+
+      <!-- ------------------------------------------- Guardar como recurso -->
+      <section class="panel" id="panel-resource" hidden>
+        <div class="field">
+          <label for="res-name">Nombre</label>
+          <input type="text" id="res-name" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="res-url">URL</label>
+          <input type="url" id="res-url" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="res-summary">Notas</label>
+          <textarea id="res-summary" placeholder="Por qué vale la pena guardarlo, opcional"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="res-kind">Tipo</label>
+          <select id="res-kind"></select>
+        </div>
+
+        <div class="field">
+          <label for="res-destination">Guardar en</label>
+          <select id="res-destination"></select>
+        </div>
+
+        <div class="shots" id="res-shots"></div>
+        <button type="button" class="btn btn-block" id="res-recapture">Capturar de nuevo</button>
+
+        <button type="button" class="btn btn-primary btn-block" id="res-submit">Guardar recurso</button>
+        <div id="res-status"></div>
+      </section>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

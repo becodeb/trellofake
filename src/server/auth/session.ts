@@ -6,6 +6,7 @@ import { cache } from "react";
 import bcrypt from "bcryptjs";
 
 import { db } from "@/server/db";
+import { actorStore } from "@/server/auth/actor";
 
 const COOKIE = "hilo_session";
 const TTL_DAYS = 30;
@@ -63,9 +64,19 @@ export async function destroySession() {
 
 /**
  * `cache` deduplica la lectura dentro de un mismo render: el layout, la página
- * y cada server component piden el usuario y se hace una sola query.
+ * y cada server component piden el usuario y se hace una sola query. Fuera de
+ * un render (p. ej. en el route handler de `/api/mcp`) `cache` no memoiza —ver
+ * la nota en `@/server/auth/actor`— así que ahí esta función corre de cero en
+ * cada llamada, sin deduplicar pero también sin arrastrar nada entre requests.
  */
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
+  // Un cliente MCP autenticado por token nunca manda la cookie de sesión: su
+  // usuario viaja en este AsyncLocalStorage, seteado por la ruta `/api/mcp`
+  // una vez que valida el `ApiToken`. Si está presente, es la fuente de
+  // verdad y la cookie ni se lee.
+  const actor = actorStore.getStore();
+  if (actor) return actor;
+
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;

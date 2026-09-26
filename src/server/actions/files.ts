@@ -27,6 +27,7 @@ export async function uploadFiles(
     const ctx = await requireTeamAction("content.write");
     const projectId = (formData.get("projectId") as string | null) || null;
     const itemId = (formData.get("itemId") as string | null) || null;
+    const resourceId = (formData.get("resourceId") as string | null) || null;
     const files = formData.getAll("files").filter((f): f is File => f instanceof File);
     if (files.length === 0) throw new Error("No llegó ningún archivo.");
     if (files.length > 10) throw new Error("Máximo 10 archivos por vez.");
@@ -43,6 +44,12 @@ export async function uploadFiles(
           select: { id: true, title: true, projectId: true },
         })
       : null;
+    const resource = resourceId
+      ? await db.knowledgeResource.findFirstOrThrow({
+          where: { id: resourceId },
+          select: { id: true, name: true, projectId: true },
+        })
+      : null;
     const saved: UploadedFile[] = [];
     for (const file of files) {
       const stored = await put(file, ctx.team.id);
@@ -54,8 +61,9 @@ export async function uploadFiles(
           sizeBytes: stored.sizeBytes,
           storageKey: stored.key,
           kind: stored.kind,
-          projectId: item?.projectId ?? project?.id ?? null,
+          projectId: item?.projectId ?? project?.id ?? resource?.projectId ?? null,
           itemId: item?.id ?? null,
+          resourceId: resource?.id ?? null,
         },
         select: { id: true },
       });
@@ -68,14 +76,14 @@ export async function uploadFiles(
         sizeBytes: stored.sizeBytes,
       });
     }
-    const targetProjectId = item?.projectId ?? project?.id ?? null;
+    const targetProjectId = item?.projectId ?? project?.id ?? resource?.projectId ?? null;
     if (targetProjectId) {
       await recordActivity({
         actorId: ctx.user.id,
         verb: ACTIVITY.fileUploaded,
         targetType: "file",
         targetId: saved[0].id,
-        targetLabel: item?.title ?? saved[0].filename,
+        targetLabel: item?.title ?? resource?.name ?? saved[0].filename,
         projectId: targetProjectId,
         itemId: item?.id ?? null,
         meta: {

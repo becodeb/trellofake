@@ -227,7 +227,7 @@ function Item({
 /** Marca de tipo: una letra en el color del proyecto. Nada de íconos genéricos. */
 function KindMark({ kind, accent }: { kind: string; accent: string }) {
   const letter =
-    { task: "T", idea: "I", note: "N", problem: "!", decision: "D", update: "A", project: "◆", file: "▣", comment: "”" }[
+    { task: "T", idea: "I", note: "N", problem: "!", decision: "D", update: "A", project: "◆", file: "▣", comment: "”", resource: "R" }[
       kind
     ] ?? "•";
   return (

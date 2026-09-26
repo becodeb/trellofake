@@ -23,6 +23,7 @@ const KIND_ORDER: SearchKind[] = [
   "note",
   "update",
   "comment",
+  "resource",
   "file",
   "person",
 ];
@@ -49,7 +50,7 @@ export default async function SearchPage({
     <Page>
       <PageHeader
         title="Buscar"
-        description="Proyectos, tareas, ideas, notas, problemas, decisiones, comentarios, archivos y personas."
+        description="Proyectos, tareas, ideas, notas, problemas, decisiones, comentarios, recursos, archivos y personas."
       />
 
       <div className="max-w-2xl">
