@@ -105,6 +105,22 @@ const base64FileSchema = z.object({
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 /**
+ * Reemplazo de fecha para el `inputSchema` de una tool.
+ *
+ * Los schemas de items/proyectos parsean sus fechas con un `optionalDate`
+ * (`.transform(v => v ? new Date(v) : null)`): dado `undefined`, el resultado
+ * es `null`. El SDK valida los argumentos contra el `inputSchema` de la tool
+ * ANTES de que el handler los reciba, y la action los vuelve a parsear con el
+ * mismo schema — si el `inputSchema` reusara `optionalDate` tal cual, una
+ * fecha ausente llegaría a la action ya convertida en `null`, y
+ * `z.string().optional()` rechaza `null` (solo acepta `undefined`): el
+ * segundo parseo no es idempotente y la creación falla con "Invalid input".
+ * Por eso los campos de fecha se declaran acá como string opcional simple; la
+ * action sigue siendo la única que corre la conversión real a `Date`.
+ */
+const dateInput = z.string().trim().optional();
+
+/**
  * Decodifica un archivo `{filename, mimeType, base64}` a un `File` real.
  * Rechaza base64 inválido y capa el tamaño decodificado al límite de
  * almacenamiento (10 MB) antes de construir el buffer definitivo.
@@ -131,7 +147,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_create_item",
     {
       description: "Crea un elemento (task, idea, note, problem, decision o update) en un proyecto.",
-      inputSchema: itemCreateSchema.shape,
+      inputSchema: { ...itemCreateSchema.shape, dueDate: dateInput },
     },
     async (args) => {
       ctx();
@@ -143,7 +159,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_update_item",
     {
       description: "Actualiza título, cuerpo, prioridad o fecha límite de un elemento.",
-      inputSchema: { itemId: z.string().min(1), ...itemUpdateSchema.shape },
+      inputSchema: { itemId: z.string().min(1), ...itemUpdateSchema.shape, dueDate: dateInput },
     },
     async (args) => {
       ctx();
@@ -261,7 +277,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_create_project",
     {
       description: "Crea un proyecto o subproyecto.",
-      inputSchema: projectCreateSchema.shape,
+      inputSchema: { ...projectCreateSchema.shape, startDate: dateInput, targetDate: dateInput },
     },
     async (args) => {
       ctx();
@@ -273,7 +289,12 @@ export function registerWriteTools(server: McpServer) {
     "hilo_update_project",
     {
       description: "Actualiza nombre, descripción, prioridad, acento o fechas de un proyecto.",
-      inputSchema: { projectId: z.string().min(1), ...projectUpdateSchema.shape },
+      inputSchema: {
+        projectId: z.string().min(1),
+        ...projectUpdateSchema.shape,
+        startDate: dateInput,
+        targetDate: dateInput,
+      },
     },
     async (args) => {
       ctx();
