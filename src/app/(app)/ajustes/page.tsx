@@ -7,6 +7,7 @@ import { Page } from "@/components/app/shell";
 import { TeamSettings } from "@/components/app/team-settings";
 import { MemberList } from "@/components/app/member-list";
 import { ApiTokens } from "@/components/app/api-tokens";
+import { ExtensionInstall } from "@/components/app/extension-install";
 import { PageHeader, SectionHeader } from "@/components/ui/layout";
 
 export const metadata = { title: "Ajustes" };
@@ -54,6 +55,11 @@ export default async function SettingsPage() {
         <section>
           <SectionHeader title="Acceso por API" />
           <ApiTokens tokens={tokens} />
+        </section>
+
+        <section>
+          <SectionHeader title="Extensión del navegador" />
+          <ExtensionInstall />
         </section>
 
         <section>

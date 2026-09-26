@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hilo — opciones</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="options">
+    <div class="options-header">
+      <h1>Hilo</h1>
+      <p>Conectá la extensión con tu instancia de Hilo (producción o local) y un token de API.</p>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="hilo-url">URL de Hilo</label>
+        <input type="url" id="hilo-url" placeholder="https://hilo.becode.com.ar" />
+      </div>
+
+      <div class="field">
+        <label for="api-token">Token de API</label>
+        <input type="password" id="api-token" placeholder="hilo_..." autocomplete="off" />
+        <p class="hint">
+          Se crea desde <a href="#" id="tokens-link" target="_blank" rel="noreferrer">Hilo → Ajustes → Acceso por API</a>.
+        </p>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn btn-primary" id="save">Guardar</button>
+        <button type="button" class="btn" id="test">Probar conexión</button>
+      </div>
+
+      <div id="status"></div>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
