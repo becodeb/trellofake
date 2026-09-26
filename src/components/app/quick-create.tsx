@@ -21,6 +21,42 @@ import {
   type ProjectOption,
 } from "@/components/app/pickers";
 
+const LAST_PROJECT_KEY = "hilo-last-project";
+
+/** Último proyecto usado para crear algo, o null si no hay nada guardado (o el storage está bloqueado). */
+function readLastProject(): string | null {
+  try {
+    return localStorage.getItem(LAST_PROJECT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveLastProject(projectId: string) {
+  try {
+    localStorage.setItem(LAST_PROJECT_KEY, projectId);
+  } catch {
+    // Modo incógnito con almacenamiento bloqueado: no se recuerda para la próxima, nada más.
+  }
+}
+
+/**
+ * Proyecto con el que arranca el diálogo: el de la página desde donde se abrió
+ * si vino explícito, si no el último que se usó para crear algo (y sigue
+ * existiendo), si no el primero de la lista.
+ */
+function pickInitialProject(
+  defaultProjectId: string | null | undefined,
+  projects: ProjectOption[],
+): string | null {
+  if (defaultProjectId && projects.some((p) => p.id === defaultProjectId)) {
+    return defaultProjectId;
+  }
+  const lastUsed = readLastProject();
+  if (lastUsed && projects.some((p) => p.id === lastUsed)) return lastUsed;
+  return projects[0]?.id ?? null;
+}
+
 /**
  * Creación rápida.
  *
@@ -64,7 +100,7 @@ export function QuickCreate({
   React.useEffect(() => {
     if (!open) return;
     setType(defaultType);
-    setProjectId(defaultProjectId ?? projects[0]?.id ?? null);
+    setProjectId(pickInitialProject(defaultProjectId, projects));
     setTitle("");
     setBody("");
     setPriority("medium");
@@ -97,6 +133,7 @@ export function QuickCreate({
       return;
     }
 
+    saveLastProject(projectId);
     toast.success(`${meta.label} creada`, { description: title.trim() });
     onOpenChange(false);
     onCreated?.(result.data.id);
