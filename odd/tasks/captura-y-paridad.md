@@ -65,17 +65,17 @@ delivery.
 - [x] T4 Images everywhere — paste (Ctrl+V) and drag images when creating an item
       (quick-create), in the item panel and in comments; attach at creation time.
       Route: delegated (writer B).
-- [ ] T5 Unify links — migrate `ResourceLink` rows into `KnowledgeResource`
+- [x] T5 Unify links — migrate `ResourceLink` rows into `KnowledgeResource`
       (data-preserving migration 0004), drop `ResourceLink`; kinds gain `site` and
       `local` (localhost / LAN IP); project tab "Integración" becomes "Recursos";
       MCP `get_project.links` stays backward compatible. Resources can carry a
       screenshot (`Attachment.resourceId`) shown as thumbnail in the library, and
       global search (⌘K + `hilo_search`) covers resources (name, summary, URL).
       Route: delegated (writer C).
-- [ ] T6 Richer overview — project "Resumen" header with prominent site / repo /
+- [x] T6 Richer overview — project "Resumen" header with prominent site / repo /
       local links, progress + rollup counters, recently completed work.
       Route: delegated (writer C).
-- [ ] T7 MCP write parity — actor context (AsyncLocalStorage) so existing server
+- [x] T7 MCP write parity — actor context (AsyncLocalStorage) so existing server
       actions run as the token's user; `hilo_*` write tools for every app action
       except login/signup/logout/password change/token management; file upload via
       base64. Route: delegated (writer D).
@@ -140,6 +140,22 @@ delivery.
   warning on project pages tied to `style={{}}` on several inputs (ProjectHeader,
   DatePicker, InlineComposer, "Pegá un link…") that predates this change.
 
+- T7 (writer D, worktree `feat/captura-mcp-parity`): `3bacbc5` actor AsyncLocalStorage feeding
+  `getCurrentUser()`; `c6e72df` 39 `hilo_*` write tools calling the existing actions; `22ff142`
+  docs; `49badcc` zod schemas moved to `src/server/actions/schemas.ts` ("use server" files may
+  only export async functions); `701e83e` date double-parse fix. Excluded: signup, login, logout,
+  changePassword, token create/revoke, touchVisit. Live (port 3612): no token → 401; 48 tools
+  listed; create item → comment → status → base64 PNG upload → read back OK; community token
+  rejected on create item/project/update team, allowed to comment.
+- T5 `48a7d5b` / T6 `204c618` (writer C, same worktree): migration `0004_unify_links` moves
+  ResourceLink → KnowledgeResource and drops it; kinds `site`/`local`; `Attachment.resourceId`
+  thumbnails; search covers resources (⌘K, /buscar, `hilo_search`); tab "Recursos" with
+  `/integracion` → 307. Migration proof on a DB copy: 7 ResourceLink rows → 7 new resources,
+  row-by-row match. Live (port 3614): overview band (site/repo/local chips, counters,
+  "Hecho hace poco") screenshot checked; `hilo_get_project.links` still present.
+- Integration: merged into `feat/captura-y-paridad` at `45e8b2e` (clean). Parent spot check:
+  `npm run typecheck` → pass after `prisma generate`.
+
 ## Next step
 
-T5/T6 (writer C) and T7 (writer D) continue in their worktrees; T4 is done.
+T8 + T9 (writer E): extension API and Chrome extension.
