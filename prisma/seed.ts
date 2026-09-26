@@ -84,7 +84,6 @@ async function main() {
   await db.comment.deleteMany();
   await db.itemAssignment.deleteMany();
   await db.item.deleteMany();
-  await db.resourceLink.deleteMany();
   await db.projectDoc.deleteMany();
   await db.projectMember.deleteMany();
   await db.project.deleteMany();
@@ -448,13 +447,24 @@ diseño que asuma confirmación automática se cae con el primer estudio real.
     { projectId: ronda.id, label: "Prototipo navegable", url: "https://figma.com/proto/ronda", kind: "figma", by: vale.id },
   ];
 
+  // Los links rápidos son recursos desde la migración 0004: el `kind` de
+  // arriba habla el vocabulario viejo (`ResourceLink`), acá se traduce al de
+  // `RESOURCE_KINDS` (src/lib/domain.ts), igual que hace la migración.
+  const LINK_KIND_TO_RESOURCE_KIND: Record<string, string> = {
+    github: "repository",
+    figma: "design",
+    drive: "document",
+    docs: "document",
+    site: "site",
+  };
+
   for (const [index, link] of links.entries()) {
-    const created = await db.resourceLink.create({
+    const created = await db.knowledgeResource.create({
       data: {
         projectId: link.projectId,
-        label: link.label,
+        name: link.label,
         url: link.url,
-        kind: link.kind,
+        kind: LINK_KIND_TO_RESOURCE_KIND[link.kind] ?? "link",
         position: index,
         addedById: link.by,
         createdAt: ago(30 - index, 12),
@@ -466,7 +476,7 @@ diseño que asuma confirmación automática se cae con el primer estudio real.
       verb: ACTIVITY.linkAdded,
       targetType: "link",
       targetId: created.id,
-      targetLabel: created.label,
+      targetLabel: created.name,
       projectId: link.projectId,
       meta: { url: link.url },
     });

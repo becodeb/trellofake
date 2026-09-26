@@ -4,6 +4,8 @@
 
 Read-only MCP tools (`hilo_*`) exposing team content to AI clients. Every tool is hard-scoped to the singleton team and is not subject to per-role visibility filtering.
 
+> **Note (2026-09-26):** this spec only covers the read tools listed here. Write tools (`hilo_create_item`, `hilo_set_item_status`, etc.) were added on top of the same `/api/mcp` endpoint and run the app's server actions — see `README.md`'s MCP section for the full list. They are out of scope for this spec.
+
 ## Requirements
 
 ### Requirement: Tool coverage

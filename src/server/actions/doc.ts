@@ -1,14 +1,13 @@
 "use server";
 
-import { z } from "zod";
-
 import { db } from "@/server/db";
 import { requireTeamAction } from "@/server/auth/context";
 import { recordActivity } from "@/server/domain/activity";
 import { renderDoc, type RenderedSegment } from "@/server/domain/doc";
 import { run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
+import { docSchema } from "@/server/actions/schemas";
 import { ACTIVITY } from "@/lib/domain";
-import { MAX_DOC_LENGTH, hasTeamOnlyContent } from "@/lib/doc";
+import { hasTeamOnlyContent } from "@/lib/doc";
 
 /**
  * Edición del "leeme" de un proyecto.
@@ -17,10 +16,6 @@ import { MAX_DOC_LENGTH, hasTeamOnlyContent } from "@/lib/doc";
  * la primera vez que alguien escribe algo. Vaciarlo lo borra, así un proyecto
  * sin contexto no arrastra una fila fantasma ni un encabezado vacío.
  */
-
-const docSchema = z.object({
-  markdown: z.string().max(MAX_DOC_LENGTH, "El documento superó los 100.000 caracteres."),
-});
 
 export async function saveProjectDoc(
   projectId: string,

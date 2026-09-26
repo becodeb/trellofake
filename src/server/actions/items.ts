@@ -1,5 +1,4 @@
 "use server";
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { requireTeamAction } from "@/server/auth/context";
@@ -7,34 +6,18 @@ import { parseMentions, recordActivity } from "@/server/domain/activity";
 import { refreshItem, refreshProject } from "@/server/domain/progress";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import {
+  itemCreateSchema as createSchema,
+  itemUpdateSchema as updateSchema,
+  itemAssigneeSchema as assigneeSchema,
+} from "@/server/actions/schemas";
+import {
   ACTIVITY,
-  ASSIGNEE_SCOPES,
-  ITEM_TYPES,
   ITEM_TYPE_META,
-  PRIORITIES,
   evenWeights,
   isValidStatus,
   normalizeWeights,
   statusMeta,
 } from "@/lib/domain";
-const optionalDate = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value ? new Date(value) : null))
-  .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-const createSchema = z.object({
-  projectId: z.string().min(1, "Elegí un proyecto."),
-  type: z.enum(ITEM_TYPES),
-  title: z.string().trim().min(1, "Escribí un título."),
-  body: z.string().trim().max(20000).optional(),
-  priority: z.enum(PRIORITIES).default("medium"),
-  status: z.string().trim().optional(),
-  dueDate: optionalDate,
-  parentId: z.string().trim().optional(),
-  assigneeIds: z.array(z.string()).default([]),
-  assigneeScope: z.enum(ASSIGNEE_SCOPES).default("individual"),
-});
 
 /**
  * Crear contenido es la acción más frecuente de la app: una sola llamada
@@ -110,13 +93,6 @@ export async function createItem(
     return { id: item.id };
   });
 }
-const updateSchema = z.object({
-  title: z.string().trim().min(1).optional(),
-  body: z.string().trim().max(20000).nullable().optional(),
-  priority: z.enum(PRIORITIES).optional(),
-  dueDate: optionalDate.optional(),
-});
-
 export async function updateItem(
   itemId: string,
   raw: unknown,
@@ -228,13 +204,6 @@ export async function setItemProgress(
   });
   return result.ok ? ok() : result;
 }
-const assigneeSchema = z.object({
-  scope: z.enum(ASSIGNEE_SCOPES).default("individual"),
-  assignees: z
-    .array(z.object({ userId: z.string(), weight: z.number().min(0).max(100).optional() }))
-    .default([]),
-});
-
 /**
  * Asignación colaborativa. Si no se pasan pesos, se reparte en partes iguales;
  * si se pasan, se normalizan para que sumen exactamente 100.

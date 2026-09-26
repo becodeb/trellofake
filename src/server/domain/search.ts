@@ -46,7 +46,7 @@ export async function search(
 
   const wants = (kind: SearchKind) => !options.kinds || options.kinds.includes(kind);
 
-  const [projects, items, comments, people, files] = await Promise.all([
+  const [projects, items, comments, people, files, resources] = await Promise.all([
     wants("project")
       ? db.project.findMany({
           where: {
@@ -127,6 +127,30 @@ export async function search(
           },
           take: LIMIT_PER_KIND,
           orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+
+    wants("resource")
+      ? db.knowledgeResource.findMany({
+          where: {
+            OR: [
+              { name: { contains: query } },
+              { summary: { contains: query } },
+              { url: { contains: query } },
+            ],
+          },
+          select: {
+            id: true,
+            name: true,
+            summary: true,
+            url: true,
+            kind: true,
+            updatedAt: true,
+            projectId: true,
+            project: { select: { id: true, name: true, accent: true } },
+          },
+          take: LIMIT_PER_KIND,
+          orderBy: { updatedAt: "desc" },
         })
       : Promise.resolve([]),
   ]);
@@ -214,6 +238,23 @@ export async function search(
       status: file.kind,
       when: file.createdAt,
       score: score(query, file.filename) - 5,
+    });
+  }
+
+  for (const resource of resources) {
+    hits.push({
+      id: resource.id,
+      kind: "resource",
+      title: resource.name,
+      excerpt: excerpt(resource.summary ?? resource.url, query),
+      href: resource.projectId
+        ? `/p/${resource.projectId}/recursos#${resource.id}`
+        : `/recursos#${resource.id}`,
+      projectName: resource.project?.name ?? null,
+      accent: resource.project?.accent ?? "stone",
+      status: resource.kind,
+      when: resource.updatedAt,
+      score: score(query, resource.name, resource.summary ?? resource.url),
     });
   }
 
