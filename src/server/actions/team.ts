@@ -8,7 +8,7 @@ import { markFeedRead } from "@/server/domain/feed";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import { ACTIVITY, WORKSPACE_ROLES, accentFromId } from "@/lib/domain";
 import { temporaryPassword } from "@/lib/slug";
-const settingsSchema = z.object({
+export const settingsSchema = z.object({
   name: z.string().trim().min(2, "El equipo necesita un nombre."),
   mission: z.string().trim().max(280).nullable().optional(),
 });
@@ -25,7 +25,7 @@ export async function updateTeam(raw: unknown): Promise<ActionResult> {
   });
   return result.ok ? ok() : result;
 }
-const memberSchema = z.object({
+export const memberSchema = z.object({
   name: z.string().trim().min(2, "Escribí el nombre de la persona."),
   email: z
     .string()

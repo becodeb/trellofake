@@ -13,7 +13,7 @@ const optionalUrl = z
   .optional()
   .transform((value) => value || null)
   .refine((value) => value === null || /^https?:\/\//i.test(value), "Usá una URL http o https.");
-const schema = z
+export const schema = z
   .object({
     name: z.string().trim().min(2, "Poné un nombre al recurso.").max(120),
     summary: z.string().trim().max(500).optional(),

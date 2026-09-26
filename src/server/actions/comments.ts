@@ -5,7 +5,7 @@ import { requireTeamAction } from "@/server/auth/context";
 import { parseMentions, recordActivity } from "@/server/domain/activity";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import { ACTIVITY, isTeamRole } from "@/lib/domain";
-const schema = z
+export const schema = z
   .object({
     body: z.string().trim().min(1, "Escribí algo.").max(8000),
     itemId: z.string().trim().optional(),

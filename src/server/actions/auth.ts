@@ -112,7 +112,7 @@ export async function logout() {
   redirect("/login");
 }
 
-const profileSchema = z.object({
+export const profileSchema = z.object({
   name: z.string().trim().min(2, "Escribí tu nombre."),
   avatarUrl: z.string().trim().optional(),
 });

@@ -18,7 +18,7 @@ import { MAX_DOC_LENGTH, hasTeamOnlyContent } from "@/lib/doc";
  * sin contexto no arrastra una fila fantasma ni un encabezado vacío.
  */
 
-const docSchema = z.object({
+export const docSchema = z.object({
   markdown: z.string().max(MAX_DOC_LENGTH, "El documento superó los 100.000 caracteres."),
 });
 

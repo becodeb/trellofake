@@ -23,7 +23,7 @@ const optionalDate = z
   .optional()
   .transform((value) => (value ? new Date(value) : null))
   .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-const createSchema = z.object({
+export const createSchema = z.object({
   projectId: z.string().min(1, "Elegí un proyecto."),
   type: z.enum(ITEM_TYPES),
   title: z.string().trim().min(1, "Escribí un título."),
@@ -110,7 +110,7 @@ export async function createItem(
     return { id: item.id };
   });
 }
-const updateSchema = z.object({
+export const updateSchema = z.object({
   title: z.string().trim().min(1).optional(),
   body: z.string().trim().max(20000).nullable().optional(),
   priority: z.enum(PRIORITIES).optional(),
@@ -228,7 +228,7 @@ export async function setItemProgress(
   });
   return result.ok ? ok() : result;
 }
-const assigneeSchema = z.object({
+export const assigneeSchema = z.object({
   scope: z.enum(ASSIGNEE_SCOPES).default("individual"),
   assignees: z
     .array(z.object({ userId: z.string(), weight: z.number().min(0).max(100).optional() }))

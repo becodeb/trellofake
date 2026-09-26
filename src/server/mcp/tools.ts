@@ -12,6 +12,7 @@ import { teamFeed } from "@/server/domain/feed";
 import { search } from "@/server/domain/search";
 import { listKnowledgeResources } from "@/server/domain/resources";
 import { teamMembers } from "@/server/domain/dashboard";
+import { registerWriteTools } from "@/server/mcp/write-tools";
 import type { TokenContext } from "@/server/auth/token";
 import {
   ITEM_TYPES,
@@ -37,7 +38,8 @@ import { splitDocSegments } from "@/lib/doc";
  */
 export const tokenContextStore = new AsyncLocalStorage<TokenContext>();
 
-function ctx(): TokenContext {
+/** Exportada para que las tools de escritura (`write-tools.ts`) reusen la misma guarda. */
+export function ctx(): TokenContext {
   const context = tokenContextStore.getStore();
   if (!context) throw new Error("MCP: contexto de token ausente.");
   return context;
@@ -49,7 +51,7 @@ function ctx(): TokenContext {
  * almacenamiento) se eliminan. Nunca exponer rutas de storage ni campos
  * internos.
  */
-function toWire<T>(value: T): T {
+export function toWire<T>(value: T): T {
   const seen = new WeakSet<object>();
   const walk = (node: unknown): unknown => {
     if (node instanceof Date) return node.toISOString();
@@ -71,15 +73,18 @@ function toWire<T>(value: T): T {
 }
 
 /** Respuesta de texto JSON, pasada por `toWire` (sin storageKeys, fechas ISO). */
-function textResult(payload: unknown) {
+export function textResult(payload: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(toWire(payload)) }] };
 }
 
 /** Limita cualquier lista a 100 ítems como máximo. */
 const take = z.number().int().min(1).max(100).optional();
 
-/** Estados válidos entre todos los tipos de contenido (vocabulario de domain.ts). */
-const ALL_STATUSES = Array.from(
+/**
+ * Estados válidos entre todos los tipos de contenido (vocabulario de domain.ts).
+ * Exportado para `hilo_set_item_status` en `write-tools.ts`.
+ */
+export const ALL_STATUSES = Array.from(
   new Set(
     [...TASK_STATUSES, ...IDEA_STATUSES, ...PROBLEM_STATUSES]
       .map((meta) => meta.value)
@@ -310,4 +315,9 @@ export function registerTools(server: McpServer) {
       return textResult(hits);
     },
   );
+
+  // Tools de escritura (`hilo_create_item`, `hilo_set_item_status`, ...):
+  // corren las mismas server actions que la app vía el actor de
+  // `@/server/auth/actor`, así que viven en su propio módulo.
+  registerWriteTools(server);
 }

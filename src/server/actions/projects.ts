@@ -21,7 +21,7 @@ const optionalDate = z
   .optional()
   .transform((value) => (value ? new Date(value) : null))
   .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-const createSchema = z.object({
+export const createSchema = z.object({
   name: z.string().trim().min(2, "El proyecto necesita un nombre."),
   description: z.string().trim().max(2000).optional(),
   parentId: z.string().trim().optional(),
@@ -94,7 +94,7 @@ export async function createProject(
     return { id: project.id };
   });
 }
-const updateSchema = z.object({
+export const updateSchema = z.object({
   name: z.string().trim().min(2).optional(),
   description: z.string().trim().max(4000).nullable().optional(),
   priority: z.enum(PRIORITIES).optional(),
@@ -328,7 +328,7 @@ export async function setProjectMembers(
   });
   return result.ok ? ok() : result;
 }
-const linkSchema = z.object({
+export const linkSchema = z.object({
   url: z.string().trim().min(3, "Pegá una URL."),
   label: z.string().trim().max(80).optional(),
 });
