@@ -56,11 +56,11 @@ delivery.
 
 ## Tasks
 
-- [ ] T1 Quick wins — favicon + app icons, center the unread badge number, "Crear"
+- [x] T1 Quick wins — favicon + app icons, center the unread badge number, "Crear"
       remembers the last used project (localStorage). Route: delegated (writer A).
-- [ ] T2 Installable app (PWA) — web manifest, icons, minimal service worker, works on
+- [x] T2 Installable app (PWA) — web manifest, icons, minimal service worker, works on
       desktop and phone. Route: delegated (writer A).
-- [ ] T3 People index — `/gente` page listing team members with role and open work;
+- [x] T3 People index — `/gente` page listing team members with role and open work;
       nav entry. Route: delegated (writer A).
 - [ ] T4 Images everywhere — paste (Ctrl+V) and drag images when creating an item
       (quick-create), in the item panel and in comments; attach at creation time.
@@ -68,7 +68,10 @@ delivery.
 - [ ] T5 Unify links — migrate `ResourceLink` rows into `KnowledgeResource`
       (data-preserving migration 0004), drop `ResourceLink`; kinds gain `site` and
       `local` (localhost / LAN IP); project tab "Integración" becomes "Recursos";
-      MCP `get_project.links` stays backward compatible. Route: delegated (writer C).
+      MCP `get_project.links` stays backward compatible. Resources can carry a
+      screenshot (`Attachment.resourceId`) shown as thumbnail in the library, and
+      global search (⌘K + `hilo_search`) covers resources (name, summary, URL).
+      Route: delegated (writer C).
 - [ ] T6 Richer overview — project "Resumen" header with prominent site / repo /
       local links, progress + rollup counters, recently completed work.
       Route: delegated (writer C).
@@ -78,11 +81,14 @@ delivery.
       base64. Route: delegated (writer D).
 - [ ] T8 Extension API — token-authenticated REST endpoints: resolve project by page
       origin, register an origin for a project, create an item with screenshots and
-      the page URL. Route: delegated (writer E).
+      the page URL, and save the current page as a resource (team library or a
+      project) with notes, kind and an optional screenshot. Route: delegated (writer E).
 - [ ] T9 Browser extension — Chrome MV3 in `extension/`: options (Hilo URL + token),
       popup that detects the project by origin or lets you pick "this is X",
-      type/title/notes, one-click tab screenshot(s), keyboard shortcut; install doc
-      linked from Ajustes. Route: delegated (writer E).
+      type/title/notes, one-click tab screenshot(s), keyboard shortcut; works on ANY
+      page with a "Guardar como recurso" mode (e.g. a site whose design you like),
+      prefilled with the page title and URL; install doc linked from Ajustes.
+      Route: delegated (writer E).
 
 ## Acceptance criteria
 
@@ -91,12 +97,23 @@ delivery.
 - Project overview shows the deployed site and repo at a glance.
 - With the extension on `localhost:3001` or `hilo.becode.com.ar`, the member can
   create a task with a screenshot in the right project in under 10 seconds.
+- From any website, the extension saves the page (title, URL, notes, screenshot)
+  as a resource, and it is later found by searching Hilo.
 - Every non-auth app action is callable via MCP with a token, respecting role.
 
 ## Progress / evidence
 
 (filled per task: commit, checks run and observed result)
 
+- T1 `9f1a0b0`, T2 `cb9b9a0`, T3 `264cfde` (writer A, delegated). typecheck: pass;
+  build: pass; lint: not configured (`next lint` has no eslint config, prompts) — skipped.
+  Live on scratch DB copy (port 3611): manifest 200 valid JSON, /icon.svg 200, /sw.js 200,
+  /gente 200 with member names; headless Chromium screenshots checked: badge centered,
+  Crear preselects last-used project. Assumed: /gente excludes community role (matches
+  assignee filter); nav "Gente" after "Proyectos"; icon reuses existing HiloMark.
+  Incident: shared `git stash` across worktrees swapped files between writers; recovered
+  byte-for-byte from dangling commits. Rule: no `git stash` while worktrees are active.
+
 ## Next step
 
-T1–T3 (writer A).
+T4 (writer B) while T7 (writer D) finishes in its worktree.
