@@ -79,11 +79,11 @@ delivery.
       actions run as the token's user; `hilo_*` write tools for every app action
       except login/signup/logout/password change/token management; file upload via
       base64. Route: delegated (writer D).
-- [ ] T8 Extension API — token-authenticated REST endpoints: resolve project by page
+- [x] T8 Extension API — token-authenticated REST endpoints: resolve project by page
       origin, register an origin for a project, create an item with screenshots and
       the page URL, and save the current page as a resource (team library or a
       project) with notes, kind and an optional screenshot. Route: delegated (writer E).
-- [ ] T9 Browser extension — Chrome MV3 in `extension/`: options (Hilo URL + token),
+- [x] T9 Browser extension — Chrome MV3 in `extension/`: options (Hilo URL + token),
       popup that detects the project by origin or lets you pick "this is X",
       type/title/notes, one-click tab screenshot(s), keyboard shortcut; works on ANY
       page with a "Guardar como recurso" mode (e.g. a site whose design you like),
@@ -155,7 +155,63 @@ delivery.
   "Hecho hace poco") screenshot checked; `hilo_get_project.links` still present.
 - Integration: merged into `feat/captura-y-paridad` at `45e8b2e` (clean). Parent spot check:
   `npm run typecheck` → pass after `prisma generate`.
+- T8 `0a46b17` (writer E, delegated). `/api/ext/{me,context,origins,items,resources}`,
+  auth+rate-limit extracted from `/api/mcp` into `@/server/http/token-gate` (both routes
+  now share it — `/api/mcp` refactored, behavior unchanged), CORS in `@/server/http/cors`
+  scoped to `chrome-extension://`/`moz-extension://` origins. `origins` and `resources`
+  both call `createResource` (not `addLink`, which doesn't return an id — needed for the
+  idempotency check and the response); `items` calls `createItem` + `uploadFiles`, page
+  URL folded into the body as "Visto en: <url>". `statusForActionError` maps the one
+  known role-capability message to 403, everything else to 400. typecheck: pass.
+  Live (scratch DB, port 3615, `DEV_TOKEN`/`COMMUNITY_TOKEN` minted via a throwaway script
+  since `server-only` blocks importing the real action from a plain `tsx` script): no
+  token → 401; `me` returns user/team/role/can; `context` for `http://localhost:3001/...`
+  empty → `origins` registers it on a project → `context` shows the match, calling
+  `origins` again returns the same id (idempotent); `items` multipart with a PNG → item
+  + `Attachment` row confirmed via Prisma, body has both notes and "Visto en: ..."; PNG
+  resource with no `projectId` → team resource, found via `hilo_search` (kind resource)
+  over a real MCP session; community token → 403 on `items`
+  ("Tu rol no permite esta acción."); OPTIONS from `Origin: chrome-extension://...` →
+  204 with `access-control-allow-origin` echoed + allow-headers/methods.
+- T9 `aa94d22` (writer E, delegated). `extension/` (MV3, no build, no external libs):
+  `manifest.json` (`activeTab`+`storage`, `optional_host_permissions` for the configured
+  Hilo origin, `_execute_action` → Alt+Shift+H), `popup.html/js` (Anotar + Guardar como
+  recurso tabs), `options.html/js`, `styles.css` (colors/radii hand-copied from
+  `globals.css`, `prefers-color-scheme` for dark — the extension can't import that file).
+  Icons via `npm run ext:icons` (`scripts/make-extension-icons.mjs`, `sharp` — present in
+  node_modules as a transitive dep, not declared in package.json). `GET /api/ext/download`
+  zips `extension/` on the fly with a dependency-free writer
+  (`src/server/ext/zip.ts` — stored entries, hand-rolled CRC32; hit and fixed one bug,
+  `0o100644 << 16` overflowing int32 in `writeUInt32LE`, needs `>>> 0`); linked from a new
+  "Extensión del navegador" section in Ajustes. Dockerfile now copies `extension/` into
+  the runner stage (the app isn't built with `output: "standalone"`, so this is a plain
+  `COPY`, same as `src/`). typecheck: pass; `npm run build`: pass (once, at the end).
+  Live: `python3 -m zipfile -l` lists `manifest.json`, `popup.js`, etc. under a
+  `hilo-extension/` prefix; unzipped and manifest parses. Headless Chromium
+  (`/usr/bin/chromium` via the `/tmp/pw` Playwright install, `--load-extension` +
+  `--headless=new`) loaded the unpacked extension with zero console/page errors on
+  `popup.html` and `options.html`. Options: filled URL+token, "Probar conexión" → real
+  fetch from the extension origin succeeded ("Conectado como Juan Ibarra..."), proving
+  the CORS headers work against a real browser, not just curl. Popup: header shows
+  team/person (real `/api/ext/me` fetch); submitted "Guardar como recurso" through the
+  actual UI (no tab data needed for that mode) → resource confirmed in the DB. Screenshots
+  of Ajustes, options (empty + filled + tested) and popup (empty, after-paste,
+  resource-filled, resource-submitted) all read back correctly.
+  Not verified, and why: `chrome.tabs.captureVisibleTab` and the tab-URL-driven "this
+  site is X" detection both need `activeTab`, which Chrome only grants on a real toolbar
+  click or the `_execute_action` shortcut — opening `popup.html` as a plain tab (the only
+  way to drive it headlessly here) never grants it, so `chrome.tabs.query` came back
+  without `url`/`title`. Per the task's own anticipated fallback, verified the paste path
+  instead: a synthetic `paste` `ClipboardEvent` with an image `File`, dispatched on
+  `document`, produced a thumbnail in `#note-shots` exactly like a real Ctrl+V would.
+  `chrome.permissions.request` (asked on saving Options) also has no prompt surface in
+  this headless harness and never resolves — seeded `chrome.storage.local` directly for
+  the rest of the test instead of relying on the permission grant. The full "Anotar" →
+  `/api/ext/items` submission was exercised end-to-end already, but via curl (see T8
+  evidence above), not through the popup UI, for the same `activeTab`/project-list reason.
 
 ## Next step
 
-T8 + T9 (writer E): extension API and Chrome extension.
+Both tasks done. Owner decides push / PR slicing per the delivery strategy above; T8/T9
+were not run through native review (RDD is off, global, per the user's 2026-09-23
+decision).
