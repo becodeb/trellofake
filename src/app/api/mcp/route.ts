@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { registerTools, tokenContextStore } from "@/server/mcp/tools";
 import { getTokenContext } from "@/server/auth/token";
+import { actorStore } from "@/server/auth/actor";
 
 /**
  * Endpoint MCP (Streamable HTTP) — acceso de lectura por token de API.
@@ -128,7 +129,15 @@ export async function POST(request: Request): Promise<Response> {
   const transport = transportFor(request);
   if (!transport) return sessionNotFound();
 
-  return tokenContextStore.run(auth.context, () => transport.handleRequest(request));
+  // Las tools de escritura llaman a las mismas server actions que la app: se
+  // autentican con `getCurrentUser()` (cookie de sesión). Un cliente MCP no
+  // manda cookie, así que el usuario del token viaja acá como "actor" —ver
+  // `@/server/auth/actor`— y cada action resuelve membership/rol con su
+  // propio `requireTeamAction()`, igual que si el usuario hubiera iniciado
+  // sesión en el navegador.
+  return actorStore.run(auth.context.user, () =>
+    tokenContextStore.run(auth.context, () => transport.handleRequest(request)),
+  );
 }
 
 export async function DELETE(request: Request): Promise<Response> {
