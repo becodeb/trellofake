@@ -3,72 +3,21 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { randomUUID } from "node:crypto";
 
 import { registerTools, tokenContextStore } from "@/server/mcp/tools";
-import { getTokenContext } from "@/server/auth/token";
 import { actorStore } from "@/server/auth/actor";
+import { authenticateRequest, gateErrorResponse } from "@/server/http/token-gate";
 
 /**
  * Endpoint MCP (Streamable HTTP) — acceso de lectura por token de API.
  *
- * La ruta solo es dueña del HTTP: autenticación Bearer, registro de sesiones y
- * rate limit. El envelope JSON-RPC 2.0 (initialize, tools/list, tools/call y
+ * La ruta solo es dueña del HTTP: autenticación Bearer + rate limit (en
+ * `@/server/http/token-gate`, compartido con `/api/ext/**`) y registro de
+ * sesiones. El envelope JSON-RPC 2.0 (initialize, tools/list, tools/call y
  * los códigos -32601/-32602/-32002/-32603) lo resuelve el SDK.
  */
 export const runtime = "nodejs";
 
 /** Sesiones activas por Mcp-Session-Id (en memoria, por proceso). */
 const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
-
-// ------------------------------------------------ rate limit (en proceso)
-
-const RATE_LIMIT_PER_MINUTE = 120;
-const RATE_WINDOW_MS = 60_000;
-
-/** Timestamps de requests por tokenId — best-effort, solo este proceso. */
-const requestLog = new Map<string, number[]>();
-
-/** true si el token todavía tiene cuota en la ventana móvil de 1 minuto. */
-function withinRateLimit(tokenId: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_WINDOW_MS;
-  const recent = (requestLog.get(tokenId) ?? []).filter((t) => t > cutoff);
-  if (recent.length >= RATE_LIMIT_PER_MINUTE) {
-    requestLog.set(tokenId, recent);
-    return false;
-  }
-  recent.push(now);
-  requestLog.set(tokenId, recent);
-  return true;
-}
-
-// ------------------------------------------------------------------- auth
-
-function bearerToken(request: Request): string | null {
-  const header = request.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) return null;
-  const raw = header.slice("Bearer ".length).trim();
-  return raw.length > 0 ? raw : null;
-}
-
-function unauthorized() {
-  return Response.json(
-    { error: "Token de API inválido, vencido o revocado." },
-    { status: 401, headers: { "content-type": "application/json" } },
-  );
-}
-
-function forbidden() {
-  return Response.json(
-    { error: "El usuario del token ya no es miembro del equipo." },
-    { status: 403, headers: { "content-type": "application/json" } },
-  );
-}
-
-function tooManyRequests() {
-  return Response.json(
-    { error: "Demasiados requests para este token. Probá en un minuto." },
-    { status: 429, headers: { "content-type": "application/json", "retry-after": "60" } },
-  );
-}
 
 /** Replica el error JSON-RPC del SDK para una sesión inexistente (404). */
 function sessionNotFound() {
@@ -117,14 +66,8 @@ function transportFor(request: Request): WebStandardStreamableHTTPServerTranspor
 // ----------------------------------------------------------------- handlers
 
 export async function POST(request: Request): Promise<Response> {
-  const raw = bearerToken(request);
-  if (!raw) return unauthorized();
-
-  const auth = await getTokenContext(raw);
-  if (auth.status === "unauthorized") return unauthorized();
-  if (auth.status === "forbidden") return forbidden();
-
-  if (!withinRateLimit(auth.context.tokenId)) return tooManyRequests();
+  const auth = await authenticateRequest(request);
+  if (auth.status !== "ok") return gateErrorResponse(request, auth.status);
 
   const transport = transportFor(request);
   if (!transport) return sessionNotFound();
@@ -141,14 +84,8 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-  const raw = bearerToken(request);
-  if (!raw) return unauthorized();
-
-  const auth = await getTokenContext(raw);
-  if (auth.status === "unauthorized") return unauthorized();
-  if (auth.status === "forbidden") return forbidden();
-
-  if (!withinRateLimit(auth.context.tokenId)) return tooManyRequests();
+  const auth = await authenticateRequest(request);
+  if (auth.status !== "ok") return gateErrorResponse(request, auth.status);
 
   const sessionId = request.headers.get("mcp-session-id");
   if (!sessionId) return sessionNotFound();
