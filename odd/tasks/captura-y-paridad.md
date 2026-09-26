@@ -62,7 +62,7 @@ delivery.
       desktop and phone. Route: delegated (writer A).
 - [x] T3 People index — `/gente` page listing team members with role and open work;
       nav entry. Route: delegated (writer A).
-- [ ] T4 Images everywhere — paste (Ctrl+V) and drag images when creating an item
+- [x] T4 Images everywhere — paste (Ctrl+V) and drag images when creating an item
       (quick-create), in the item panel and in comments; attach at creation time.
       Route: delegated (writer B).
 - [ ] T5 Unify links — migrate `ResourceLink` rows into `KnowledgeResource`
@@ -113,7 +113,33 @@ delivery.
   assignee filter); nav "Gente" after "Proyectos"; icon reuses existing HiloMark.
   Incident: shared `git stash` across worktrees swapped files between writers; recovered
   byte-for-byte from dangling commits. Rule: no `git stash` while worktrees are active.
+- T4 `f456365` (writer B, delegated). New shared hook/component
+  `src/components/app/use-paste-files.tsx` (usePasteFiles, usePendingAttachments,
+  PendingAttachmentsTray, uploadPendingFiles, filterUploadableFiles) reused by
+  quick-create, item-panel and comments; no changes to `src/server/actions/*.ts`
+  (avoided per merge-conflict guidance for writer working on MCP schemas in the
+  linked worktree). typecheck: pass; build: not re-run (only ran once per task
+  as planned, deferred to closing pass); lint: not configured — skipped.
+  Live on scratch DB copy (port 3613) with headless Chromium (system `/usr/bin/chromium`
+  driven via the `/tmp/pw` global Playwright install, no browsers bundled in-repo):
+  dispatched synthetic `paste` ClipboardEvents with an in-memory PNG File. Quick-create:
+  pending thumbnail rendered, item created, then `Attachment` row created with the new
+  `itemId` and kind `image`, served 200 by `/api/files/...` — verified via Prisma query
+  against the scratch DB. Item panel: pasted while the title textarea had focus (not the
+  comment box); second `Attachment` row appended with the same `itemId`, both images
+  visible in "Archivos". Comments: pasted into the comment composer; on submit, files
+  uploaded first and the `Comment` row shows the attachment with both `commentId` and
+  `itemId` set. Sanity: a synthetic text-only paste dispatched at the comment textarea
+  did not get intercepted (hook only acts when `clipboardData.files` is non-empty).
+  Assumed: mobile camera access relies on leaving the file input's `accept` unset (matches
+  the existing `FileDrop` convention) rather than restricting to `accept="image/*"`, since
+  an unrestricted file input already offers camera + gallery + files on iOS/Android.
+  "Archivos" discoverability addressed by rewording the drop-zone label from "Soltá un
+  archivo o imagen" to "Agregar imagen o archivo" (the control was already clickable).
+  Noted, not fixed (pre-existing, unrelated to this task): a React hydration-mismatch
+  warning on project pages tied to `style={{}}` on several inputs (ProjectHeader,
+  DatePicker, InlineComposer, "Pegá un link…") that predates this change.
 
 ## Next step
 
-T4 (writer B) while T7 (writer D) finishes in its worktree.
+T5/T6 (writer C) and T7 (writer D) continue in their worktrees; T4 is done.
