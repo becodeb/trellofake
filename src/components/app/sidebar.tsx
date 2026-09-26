@@ -202,7 +202,7 @@ function NavLink({
       <span className={cn("shrink-0", active ? "text-accent" : "text-ink-3")}>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold tabular text-on-accent">
+        <span className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none tabular text-on-accent">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
