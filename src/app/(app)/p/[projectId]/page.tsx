@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 import { getTeamContext } from "@/server/auth/context";
 import { getProject, subtreeIds } from "@/server/domain/projects";
-import { listItems } from "@/server/domain/items";
+import { listItems, recentlyCompleted } from "@/server/domain/items";
 import { projectHistory } from "@/server/domain/feed";
 import { teamMembers } from "@/server/domain/dashboard";
 import { db } from "@/server/db";
@@ -14,8 +14,8 @@ import { relativeTime } from "@/lib/format";
 import { ItemRow, InlineComposer } from "@/components/app/item-row";
 import { ActivityLine } from "@/components/app/activity";
 import { CommentThread } from "@/components/app/comments";
-import { ResourceLinks } from "@/components/app/resource-links";
 import { ProjectDocSection } from "@/components/app/project-doc-section";
+import { ProjectOverviewBand } from "@/components/app/project-overview-band";
 import { EmptyState, SectionHeader } from "@/components/ui/layout";
 import { ProgressBar } from "@/components/ui/glyphs";
 
@@ -44,7 +44,7 @@ export default async function ProjectOverview({
   const userId = ctx.user.id;
   const ids = await subtreeIds(project.id, project.path);
 
-  const [openTasks, decisions, problems, activity, members, comments] = await Promise.all([
+  const [openTasks, decisions, problems, done, activity, members, comments] = await Promise.all([
     listItems({
       projectIds: ids,
       types: ["task"],
@@ -66,6 +66,7 @@ export default async function ProjectOverview({
       orderBy: "recent",
       take: 4,
     }),
+    recentlyCompleted(ids, 5),
     projectHistory(ids, { take: 12 }),
     teamMembers(),
     db.comment.findMany({
@@ -86,8 +87,13 @@ export default async function ProjectOverview({
   const people = members.map((m) => m.user);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_312px]">
-      <div className="min-w-0 space-y-8">
+    <div className="space-y-6">
+      {/* El sitio, el repo y los entornos locales, a un click: es lo primero
+          que alguien busca al entrar y era lo más escondido. */}
+      <ProjectOverviewBand project={project} canWrite={ctx.can("content.write")} />
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_312px]">
+        <div className="min-w-0 space-y-8">
         {/* El contexto antes que el trabajo del día: qué es esto y qué hace
             falta para tocarlo se lee antes que qué está pasando hoy. */}
         <ProjectDocSection projectId={project.id} canWrite />
@@ -170,6 +176,17 @@ export default async function ProjectOverview({
           </div>
         </section>
 
+        {done.length > 0 && (
+          <section>
+            <SectionHeader title="Hecho hace poco" count={done.length} />
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
+              {done.map((item) => (
+                <ItemRow key={item.id} item={item} showProject={item.projectId !== project.id} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {problems.length > 0 && (
           <section>
             <SectionHeader title="Problemas abiertos" count={problems.length} />
@@ -234,15 +251,6 @@ export default async function ProjectOverview({
 
       <aside className="min-w-0 space-y-8">
         <section>
-          <SectionHeader title="Enlaces del proyecto" count={project.links.length} />
-          <ResourceLinks
-            projectId={project.id}
-            links={project.links}
-            canWrite={ctx.can("content.write")}
-          />
-        </section>
-
-        <section>
           <SectionHeader
             title="Lo último"
             action={
@@ -272,6 +280,7 @@ export default async function ProjectOverview({
           )}
         </section>
       </aside>
+      </div>
     </div>
   );
 }
@@ -302,7 +311,12 @@ async function CommunityProjectOverview({
   ]);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="space-y-6">
+      {/* Mismo encabezado que ve el equipo, en modo lectura: nada de "Agregar
+          enlace", el resto (sitio, repo, avance) es información pública. */}
+      <ProjectOverviewBand project={project} canWrite={false} />
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-8">
         {/* Mismo documento, ya recortado: los bloques del equipo no llegan. */}
         <ProjectDocSection projectId={project.id} canWrite={false} />
@@ -350,6 +364,7 @@ async function CommunityProjectOverview({
           <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-ink">Ver recursos <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span>
         </Link>
       </aside>
+      </div>
     </div>
   );
 }

@@ -101,6 +101,21 @@ export async function listItems(filter: ItemFilter = {}) {
   return rows;
 }
 
+/**
+ * Lo último que se terminó en un subárbol, de cualquier tipo (tarea, idea
+ * aceptada, problema resuelto...). Alimenta "Hecho hace poco" en el resumen
+ * del proyecto: `completedAt` ya lo pone `setItemStatus` al llegar a un
+ * estado terminal que vale 100, así que no hace falta un cómputo aparte.
+ */
+export async function recentlyCompleted(projectIds: string[], take = 5) {
+  return db.item.findMany({
+    where: { projectId: { in: projectIds }, completedAt: { not: null } },
+    select: itemRowSelect,
+    orderBy: { completedAt: "desc" },
+    take,
+  });
+}
+
 /** Vencidas primero, después por fecha, después por prioridad. */
 export function sortByUrgency<T extends { dueDate: Date | null; priority: string; status: string }>(
   items: T[],
