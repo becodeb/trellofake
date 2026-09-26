@@ -1,35 +1,10 @@
 "use server";
-import { z } from "zod";
 import { db } from "@/server/db";
 import { requireTeamAction } from "@/server/auth/context";
 import { recordActivity } from "@/server/domain/activity";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
-import { ACTIVITY, RESOURCE_KINDS } from "@/lib/domain";
-import { normalizeMarkdownSource } from "@/lib/resources";
-const optionalUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .optional()
-  .transform((value) => value || null)
-  .refine((value) => value === null || /^https?:\/\//i.test(value), "Usá una URL http o https.");
-export const schema = z
-  .object({
-    name: z.string().trim().min(2, "Poné un nombre al recurso.").max(120),
-    summary: z.string().trim().max(500).optional(),
-    kind: z.enum(RESOURCE_KINDS).default("link"),
-    url: optionalUrl,
-    accessGuide: z.string().trim().max(5000).optional(),
-    markdown: z.string().trim().max(100000).optional(),
-    markdownUrl: optionalUrl,
-    projectId: z.string().trim().optional(),
-  })
-  .refine((value) => Boolean(value.url || value.accessGuide || value.markdown || value.markdownUrl), {
-    message: "Agregá un enlace o instrucciones para usar el recurso.",
-  })
-  .refine((value) => !value.markdownUrl || Boolean(normalizeMarkdownSource(value.markdownUrl)), {
-    message: "La guía remota debe ser un archivo de GitHub (github.com o raw.githubusercontent.com).",
-  });
+import { resourceSchema as schema } from "@/server/actions/schemas";
+import { ACTIVITY } from "@/lib/domain";
 
 export async function createResource(
   raw: unknown,

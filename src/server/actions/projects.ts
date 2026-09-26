@@ -7,31 +7,13 @@ import { recordActivity } from "@/server/domain/activity";
 import { refreshProject } from "@/server/domain/progress";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
 import {
-  ACTIVITY,
-  PRIORITIES,
-  PROJECT_STATUSES,
-  accentFromId,
-  ACCENTS,
-} from "@/lib/domain";
+  projectCreateSchema as createSchema,
+  projectUpdateSchema as updateSchema,
+  projectLinkSchema as linkSchema,
+} from "@/server/actions/schemas";
+import { ACTIVITY, PROJECT_STATUSES, accentFromId } from "@/lib/domain";
 import { detectLinkKind, normalizeUrl, suggestLabel } from "@/lib/links";
 import { normalizeFraming } from "@/lib/cover";
-const optionalDate = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value ? new Date(value) : null))
-  .refine((value) => value === null || !Number.isNaN(value.getTime()), "Fecha inválida.");
-export const createSchema = z.object({
-  name: z.string().trim().min(2, "El proyecto necesita un nombre."),
-  description: z.string().trim().max(2000).optional(),
-  parentId: z.string().trim().optional(),
-  priority: z.enum(PRIORITIES).default("medium"),
-  accent: z.enum(ACCENTS).optional(),
-  startDate: optionalDate,
-  targetDate: optionalDate,
-  memberIds: z.array(z.string()).default([]),
-  coverUrl: z.string().trim().optional(),
-});
 
 export async function createProject(
   raw: unknown,
@@ -94,16 +76,6 @@ export async function createProject(
     return { id: project.id };
   });
 }
-export const updateSchema = z.object({
-  name: z.string().trim().min(2).optional(),
-  description: z.string().trim().max(4000).nullable().optional(),
-  priority: z.enum(PRIORITIES).optional(),
-  accent: z.enum(ACCENTS).optional(),
-  startDate: optionalDate.optional(),
-  targetDate: optionalDate.optional(),
-  coverUrl: z.string().trim().nullable().optional(),
-});
-
 export async function updateProject(
   projectId: string,
   raw: unknown,
@@ -328,11 +300,6 @@ export async function setProjectMembers(
   });
   return result.ok ? ok() : result;
 }
-export const linkSchema = z.object({
-  url: z.string().trim().min(3, "Pegá una URL."),
-  label: z.string().trim().max(80).optional(),
-});
-
 export async function addLink(
   projectId: string,
   raw: unknown,

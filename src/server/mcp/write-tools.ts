@@ -9,6 +9,27 @@ import { MIN_ZOOM, MAX_ZOOM } from "@/lib/cover";
 import { PROJECT_STATUSES, WORKSPACE_ROLES } from "@/lib/domain";
 import type { ActionResult } from "@/server/actions/shared";
 
+// Los schemas viven en un módulo aparte (`@/server/actions/schemas`): un
+// archivo "use server" solo puede exportar funciones async, así que las
+// actions los importan de ahí en vez de declararlos inline — ver el comentario
+// en ese módulo. Acá se reusa exactamente el mismo objeto (`.shape` como
+// `inputSchema`), nunca una copia.
+import {
+  itemCreateSchema,
+  itemUpdateSchema,
+  itemAssigneeSchema,
+  projectCreateSchema,
+  projectUpdateSchema,
+  projectLinkSchema,
+  commentSchema as addCommentSchema,
+  proposalCreateSchema,
+  proposalTriageSchema,
+  resourceSchema as createResourceSchema,
+  docSchema,
+  teamSettingsSchema as updateTeamSchema,
+  teamMemberSchema as addMemberSchema,
+} from "@/server/actions/schemas";
+
 import {
   createItem,
   updateItem,
@@ -19,9 +40,6 @@ import {
   moveItem,
   deleteItem,
   recomputeProject,
-  createSchema as createItemSchema,
-  updateSchema as updateItemSchema,
-  assigneeSchema as setAssigneesSchema,
 } from "@/server/actions/items";
 import {
   createProject,
@@ -34,44 +52,18 @@ import {
   addLink,
   removeLink,
   deleteProject,
-  createSchema as createProjectSchema,
-  updateSchema as updateProjectSchema,
-  linkSchema as addLinkSchema,
 } from "@/server/actions/projects";
-import {
-  addComment,
-  editComment,
-  deleteComment,
-  schema as addCommentSchema,
-} from "@/server/actions/comments";
+import { addComment, editComment, deleteComment } from "@/server/actions/comments";
 import {
   createProposal,
   replyToProposal,
   triageProposal,
   promoteProposal,
-  createSchema as createProposalSchema,
-  triageSchema as triageProposalSchema,
 } from "@/server/actions/proposals";
-import {
-  createResource,
-  deleteResource,
-  schema as createResourceSchema,
-} from "@/server/actions/resources";
-import {
-  saveProjectDoc,
-  previewProjectDoc,
-  docSchema,
-} from "@/server/actions/doc";
+import { createResource, deleteResource } from "@/server/actions/resources";
+import { saveProjectDoc, previewProjectDoc } from "@/server/actions/doc";
 import { uploadFiles, uploadCover, deleteAttachment } from "@/server/actions/files";
-import {
-  updateTeam,
-  addMember,
-  setMemberRole,
-  removeMember,
-  markRead,
-  settingsSchema as updateTeamSchema,
-  memberSchema as addMemberSchema,
-} from "@/server/actions/team";
+import { updateTeam, addMember, setMemberRole, removeMember, markRead } from "@/server/actions/team";
 import { updateProfile } from "@/server/actions/auth";
 
 /**
@@ -139,7 +131,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_create_item",
     {
       description: "Crea un elemento (task, idea, note, problem, decision o update) en un proyecto.",
-      inputSchema: createItemSchema.shape,
+      inputSchema: itemCreateSchema.shape,
     },
     async (args) => {
       ctx();
@@ -151,7 +143,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_update_item",
     {
       description: "Actualiza título, cuerpo, prioridad o fecha límite de un elemento.",
-      inputSchema: { itemId: z.string().min(1), ...updateItemSchema.shape },
+      inputSchema: { itemId: z.string().min(1), ...itemUpdateSchema.shape },
     },
     async (args) => {
       ctx();
@@ -192,7 +184,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_set_item_assignees",
     {
       description: "Asigna personas (o todo el equipo) a un elemento, con reparto de pesos.",
-      inputSchema: { itemId: z.string().min(1), ...setAssigneesSchema.shape },
+      inputSchema: { itemId: z.string().min(1), ...itemAssigneeSchema.shape },
     },
     async (args) => {
       ctx();
@@ -269,7 +261,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_create_project",
     {
       description: "Crea un proyecto o subproyecto.",
-      inputSchema: createProjectSchema.shape,
+      inputSchema: projectCreateSchema.shape,
     },
     async (args) => {
       ctx();
@@ -281,7 +273,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_update_project",
     {
       description: "Actualiza nombre, descripción, prioridad, acento o fechas de un proyecto.",
-      inputSchema: { projectId: z.string().min(1), ...updateProjectSchema.shape },
+      inputSchema: { projectId: z.string().min(1), ...projectUpdateSchema.shape },
     },
     async (args) => {
       ctx();
@@ -369,7 +361,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_add_project_link",
     {
       description: "Agrega un enlace (sitio, repo, etc.) a un proyecto.",
-      inputSchema: { projectId: z.string().min(1), ...addLinkSchema.shape },
+      inputSchema: { projectId: z.string().min(1), ...projectLinkSchema.shape },
     },
     async (args) => {
       ctx();
@@ -446,7 +438,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_create_proposal",
     {
       description: "Crea una propuesta de la comunidad (proyecto nuevo, mejora o necesidad).",
-      inputSchema: createProposalSchema.shape,
+      inputSchema: proposalCreateSchema.shape,
     },
     async (args) => {
       ctx();
@@ -470,7 +462,7 @@ export function registerWriteTools(server: McpServer) {
     "hilo_triage_proposal",
     {
       description: "Cambia el estado de una propuesta y, opcionalmente, el proyecto destino.",
-      inputSchema: { proposalId: z.string().min(1), ...triageProposalSchema.shape },
+      inputSchema: { proposalId: z.string().min(1), ...proposalTriageSchema.shape },
     },
     async (args) => {
       ctx();

@@ -10,6 +10,7 @@ import {
   verifyPassword,
 } from "@/server/auth/session";
 import { ok, run, type ActionResult } from "@/server/actions/shared";
+import { profileSchema } from "@/server/actions/schemas";
 import { accentFromId } from "@/lib/domain";
 const emailField = z
   .string()
@@ -111,11 +112,6 @@ export async function logout() {
   await destroySession();
   redirect("/login");
 }
-
-export const profileSchema = z.object({
-  name: z.string().trim().min(2, "Escribí tu nombre."),
-  avatarUrl: z.string().trim().optional(),
-});
 
 export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const result = await run(async () => {

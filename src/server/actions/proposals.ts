@@ -5,13 +5,11 @@ import { requireTeamAction } from "@/server/auth/context";
 import { recordActivity } from "@/server/domain/activity";
 import { createProject } from "@/server/actions/projects";
 import { ok, run, revalidateTeam, type ActionResult } from "@/server/actions/shared";
-import { ACTIVITY, PROPOSAL_STATUSES, isTeamRole } from "@/lib/domain";
-export const createSchema = z.object({
-  title: z.string().trim().min(4, "Contá la idea en un título un poco más claro.").max(160),
-  body: z.string().trim().min(12, "Agregá un poco de contexto para poder evaluarla.").max(8000),
-  category: z.enum(["project", "improvement", "need"]).default("project"),
-  targetProjectId: z.string().trim().optional(),
-});
+import {
+  proposalCreateSchema as createSchema,
+  proposalTriageSchema as triageSchema,
+} from "@/server/actions/schemas";
+import { ACTIVITY, isTeamRole } from "@/lib/domain";
 
 export async function createProposal(
   raw: unknown,
@@ -87,11 +85,6 @@ export async function replyToProposal(
   });
   return result.ok ? ok() : result;
 }
-export const triageSchema = z.object({
-  status: z.enum(PROPOSAL_STATUSES),
-  targetProjectId: z.string().trim().nullable().optional(),
-});
-
 export async function triageProposal(
   proposalId: string,
   raw: unknown,
