@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   Library,
   Lightbulb,
+  Users,
 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -55,6 +56,7 @@ export function Sidebar({
       ? [{ href: "/mi-trabajo", label: "Mi trabajo", icon: ListChecks, count: myOpenTasks }]
       : []),
     { href: "/proyectos", label: "Proyectos", icon: LayoutGrid },
+    { href: "/gente", label: "Gente", icon: Users },
     { href: "/ideas", label: "Ideas propuestas", icon: Lightbulb },
     { href: "/recursos", label: "Recursos compartidos", icon: Library },
   ];
