@@ -17,6 +17,7 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/extension ./extension
+COPY --from=builder /app/public ./public
 RUN npx prisma generate && mkdir -p /app/data /app/storage
 COPY docker-entrypoint.sh /usr/local/bin/hilo-entrypoint
 RUN chmod +x /usr/local/bin/hilo-entrypoint
